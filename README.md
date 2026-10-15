@@ -18,7 +18,7 @@ PaneTag reserves one row of the pane for a bar that apps can't draw over.
 ## Quick start
 
 ```powershell
-git clone https://github.com/<you>/PaneTag.git
+git clone https://github.com/WaelT/PaneTag.git
 cd PaneTag
 .\install.ps1              # build the helper and install the module (PowerShell 5.1 and 7)
 ```
