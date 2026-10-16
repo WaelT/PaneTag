@@ -1,0 +1,19 @@
+name: Smoke tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows PowerShell 5.1, the oldest shell PaneTag supports.
+      - name: Build and run smoke tests
+        shell: powershell
+        run: .\tests\smoke.ps1
