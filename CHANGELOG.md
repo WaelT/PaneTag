@@ -7,12 +7,17 @@ All notable changes to this project are documented here. Versions follow
 
 ### Added
 
-- `panetag --rename TEXT` renames the current pane's bar instantly from any shell in the
-  pane, including Claude Code's `!` commands (`! panetag --rename Reviewing PR`). Quotes
-  are optional; `-c` and `--fg` can be combined with it.
-- `panetag --update` applies `-t`, `-c` and `--fg` to the current pane's bar.
-- Inside a titled pane, `panetag` is on the PATH, so both work by name.
+- `ptag` now works in every shell inside a titled pane, not just PowerShell: the build
+  adds a `ptag.exe` copy and each titled pane puts it on its PATH. Rename while an app is
+  running with Claude Code's `!` commands: `! ptag Reviewing PR`. It's instant.
 - Demo GIF in the README.
+
+### Changed
+
+- `panetag.exe` takes the title as plain words (`panetag Backend API -c blue`); quotes are
+  optional. **The command to run must now follow `--`** (`panetag Agent -- claude`).
+- Inside a pane that already has a bar, `panetag`/`ptag` change that bar instead of
+  starting a second one. Start-only options (`-p`, `--cwd`, a command) are refused there.
 
 ## [0.1.0] - 2026-10-15
 

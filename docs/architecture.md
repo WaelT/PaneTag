@@ -149,13 +149,17 @@ uses the default security settings, so only the same user can connect.
 There are two clients:
 
 - `Set-PaneTag` in the module writes to the pipe directly from PowerShell.
-- `panetag --rename` / `panetag --update` (`Program.SendUpdate`) validates the colors,
-  writes the lines and exits, without starting a pseudo console. So it works from any
-  shell and starts instantly.
+- `panetag.exe` / `ptag.exe` itself. When `PANETAG_PIPE` is set, `Program.Main` doesn't
+  start a bar: `SendUpdate` validates the colors, writes the lines and exits. So it works
+  from any shell and starts instantly. Start-only options (`-p`, `--cwd`, a command) are
+  refused there, which also prevents nesting a second bar.
 
 To make the second one usable by name, the wrapper appends its own folder to `PATH` in
-the environment it passes to the child (`AddSelfToPath`). Every process in the pane,
-including Git Bash started by Claude Code, inherits both `PATH` and `PANETAG_PIPE`.
+the environment it passes to the child (`AddSelfToPath`), and `build.ps1` puts a
+`ptag.exe` copy next to `panetag.exe`. Every process in the pane, including Git Bash
+started by Claude Code, inherits both `PATH` and `PANETAG_PIPE`, so `ptag` means the same
+thing in every shell. In PowerShell the module's `ptag` alias wins over `ptag.exe`; both
+behave the same.
 
 Example without either client:
 

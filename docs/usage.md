@@ -1,12 +1,14 @@
 # Usage
 
-There are two ways to use PaneTag:
+There is one command to remember: **`ptag`**.
 
-- **The PowerShell module** (`Set-PaneTag`, alias `ptag`): the everyday way, from inside any pane.
-- **`panetag.exe` directly**: for Windows Terminal profiles, key bindings and `wt` layout scripts.
+- At a PowerShell prompt, `ptag` is the module's `Set-PaneTag` command.
+- In any other shell inside a titled pane (cmd, Git Bash, Claude Code's `!` commands),
+  `ptag` is `ptag.exe`, a copy of the program.
 
-Both put the same bar on the pane. The module just starts `panetag.exe` for you, or
-renames the bar when you're already inside one.
+Both behave the same: in a pane without a bar, `ptag Title` adds one; in a pane with a
+bar, `ptag New title` renames it. `panetag.exe` is the same program under its full name,
+for Windows Terminal profiles, key bindings and `wt` layout scripts.
 
 ## Installing
 
@@ -15,7 +17,8 @@ cd PaneTag        # the cloned repository
 .\install.ps1
 ```
 
-This builds `PaneTag\panetag.exe` and copies the `PaneTag` module folder to:
+This builds `PaneTag\panetag.exe` (plus its `ptag.exe` copy) and copies the `PaneTag`
+module folder to:
 
 - `Documents\WindowsPowerShell\Modules\PaneTag` (Windows PowerShell 5.1)
 - `Documents\PowerShell\Modules\PaneTag` (PowerShell 7)
@@ -76,62 +79,56 @@ The exit code of the shell or command is passed back, so `$LASTEXITCODE` works a
 
 ## Renaming while an app is running
 
-While claude, codex or another app is running, you can't type `ptag` in that pane.
-Instead, use `panetag --rename` from **any shell inside the pane**. Every titled pane has
-`panetag` on its PATH, so it works from PowerShell, cmd, and Git Bash (which Claude Code's
-`!` commands use). It's instant: no PowerShell needs to start.
-
-In Claude Code, type:
+While claude, codex or another app is running, the pane's PowerShell prompt is busy. Use
+`ptag` from the app's own shell instead: every titled pane has `ptag` on its PATH, so it
+works from cmd and Git Bash too. In Claude Code, `!` runs a command:
 
 ```
-! panetag --rename Reviewing PR
-! panetag --rename Reviewing PR -c red
-! panetag --update -c green
+! ptag Reviewing PR
+! ptag Reviewing PR -c red
+! ptag -c green
+! ptag --fg black
 ```
 
-Quotes are optional: all words after `--rename` become the title. You can also just ask
-Claude to "rename this pane to Reviewing PR with panetag --rename".
+Quotes are optional: all plain words become the title. It's instant, because no
+PowerShell has to start. You can also just ask Claude to "rename this pane to Reviewing PR
+with ptag".
 
-| Command | Effect |
-| --- | --- |
-| `panetag --rename TEXT` | Rename the bar |
-| `panetag --rename TEXT -c COLOR --fg COLOR` | Rename and recolor |
-| `panetag --update -c COLOR` | Recolor only |
-| `panetag --update --fg COLOR` | Change the text color only |
+Inside a pane that has a bar, `ptag` never starts a second one. Options that only apply
+when starting a bar (`-p`, `--cwd`, or a command after `--`) are refused with
+`this pane already has a bar`.
 
-Outside a titled pane these print `not inside a PaneTag pane` and exit with code 1.
+> Panes started before you upgraded to 0.2.0 don't have `ptag` on their PATH. Type
+> `exit` and start the bar again.
 
-> Panes started before you upgraded to 0.2.0 don't have `panetag` on their PATH. Type
-> `exit` and start the bar again, or call `panetag.exe` by its full path.
-
-## `panetag.exe`
+## `panetag.exe` / `ptag.exe`
 
 ```
-panetag [options] [--] [command [args...]]
-panetag --rename TEXT [-c COLOR] [--fg COLOR]
-panetag --update [-t TEXT] [-c COLOR] [--fg COLOR]
+panetag [TITLE...] [options] [-- command [args...]]
 ```
+
+In a pane without a bar it starts one. In a pane with a bar it changes that bar (title,
+`-c`, `--fg`) and exits.
 
 | Option | Description |
 | --- | --- |
-| `-t`, `--title TEXT` | Bar text. Default: the working folder's name. |
+| `TITLE...` | Bar text; all plain words are joined, so quotes are optional. Default: the working folder's name. |
+| `-t`, `--title TEXT` | Bar text, as an option (use it when the title starts with `-`). |
 | `-c`, `--color COLOR` | Bar background (name or `#RRGGBB`). Default: picked from the title. |
 | `--fg COLOR` | Text color. Default: black or white for contrast. |
 | `-p`, `--position top\|bottom` | Where the bar goes. Default: `top`. |
 | `--cwd DIR` | Working folder for the command. Default: the current folder. |
-| `--cmd CMDLINE` | The full command line as a single string (alternative to trailing arguments). |
+| `--cmd CMDLINE` | The full command line as a single string (alternative to `-- command`). |
 | `--title-b64`, `--cwd-b64`, `--cmd-b64` | Same as above, but base64-encoded UTF-8. The module uses these to avoid Windows PowerShell's quoting bugs. |
-| `--rename TEXT` | Inside a titled pane: rename its bar, then exit. Extra words are appended to the title. See [Renaming while an app is running](#renaming-while-an-app-is-running). |
-| `--update` | Inside a titled pane: apply `-t`, `-c` and `--fg` to its bar, then exit. |
 | `-h`, `--help` | Show help. |
 
-Everything after the options (or after `--`) is the command to run. Without a command it
-runs `powershell.exe -NoLogo`.
+The command to run goes after `--`. Without one, it runs `powershell.exe -NoLogo`.
+`-p`, `--cwd`, `--cmd` and the command only apply when starting a bar.
 
 ```powershell
-panetag.exe -t Backend -c blue                      # Windows PowerShell under a blue bar
-panetag.exe -t Agent -- claude --continue           # claude under a bar
-panetag.exe -t Shell -p bottom -- pwsh -NoLogo      # PowerShell 7, bar at the bottom
+panetag.exe Backend -c blue                         # Windows PowerShell under a blue bar
+panetag.exe Agent -- claude --continue              # claude under a bar
+panetag.exe Shell -p bottom -- pwsh -NoLogo         # PowerShell 7, bar at the bottom
 ```
 
 The exit code is the command's exit code, or `1` if `panetag.exe` itself failed to start
@@ -143,8 +140,8 @@ The exit code is the command's exit code, or `1` if `panetag.exe` itself failed 
 | --- | --- | --- |
 | `PANETAG_POSITION` | You | Default position (`top` or `bottom`) when none is given. |
 | `PANETAG_COLOR` | You | Default bar color when none is given. |
-| `PANETAG_PIPE` | `panetag.exe` | Set inside a titled pane. Names the pipe that `Set-PaneTag` and `panetag --rename` use to update the bar. Don't set it yourself. |
-| `PATH` | `panetag.exe` | Inside a titled pane, `panetag.exe`'s folder is added to the end of `PATH`, so `panetag` works by name. Your PATH outside the pane is not changed. |
+| `PANETAG_PIPE` | `panetag.exe` | Set inside a titled pane. Names the pipe that `ptag` uses to update the bar, and tells `ptag` it's inside a titled pane. Don't set it yourself. |
+| `PATH` | `panetag.exe` | Inside a titled pane, `panetag.exe`'s folder is added to the end of `PATH`, so `ptag` and `panetag` work by name in any shell. Your PATH outside the pane is not changed. |
 
 ## Colors
 

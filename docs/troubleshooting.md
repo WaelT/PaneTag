@@ -35,32 +35,29 @@ $env:PANETAG_POSITION = 'bottom'   # in $PROFILE to make it the default
 
 See [architecture.md](architecture.md#scrollback) for why.
 
-## `panetag: not inside a PaneTag pane`
+## `ptag` is not recognized in Git Bash, cmd or Claude Code
 
-`panetag --rename` and `--update` only work in a pane that has a bar, because they need the
-`PANETAG_PIPE` variable that the bar sets. Start a bar first with `ptag`.
+Outside PowerShell, `ptag` only exists **inside a titled pane**, where the bar puts it on
+the PATH. If the pane has a bar and `ptag` still isn't found, the bar was started by a
+version before 0.2.0: type `exit` and start it again.
 
-## `panetag` is not recognized inside a titled pane
+## `panetag: this pane already has a bar`
 
-The pane's bar was started by a version before 0.2.0, which didn't add `panetag` to the
-pane's PATH. Type `exit`, then start the bar again. Or call it by its full path:
-`(Get-Module -ListAvailable PaneTag).ModuleBase + '\panetag.exe'`.
+Inside a titled pane, `ptag` changes the existing bar. Options that only make sense
+when starting a bar (`-p`, `--cwd`, or a command after `--`) are refused, so you don't
+end up with two bars in one pane. Type `exit` first if you want to start over with
+different options. Running `ptag` with nothing to change gives the same message.
 
-## Renaming does nothing, or "Cannot reach this pane's title bar"
+## Renaming does nothing, or "Cannot reach this pane's bar"
 
-`Set-PaneTag` and `panetag --rename` rename through the pipe named in `$env:PANETAG_PIPE`. That fails if
-the variable was inherited by a process that outlived its bar (for example a shell started
+`ptag` renames through the pipe named in `$env:PANETAG_PIPE`. That fails if the
+variable was inherited by a process that outlived its bar (for example a shell started
 from a titled pane and then moved elsewhere). Clear it and start a new bar:
 
 ```powershell
 Remove-Item Env:PANETAG_PIPE
 ptag 'New title'
 ```
-
-## Two bars in one pane
-
-You ran `panetag.exe` directly inside a pane that already had a bar. `ptag` avoids
-this by renaming instead. Type `exit` to leave the inner one.
 
 ## The bar flickers or briefly disappears
 

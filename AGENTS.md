@@ -17,7 +17,7 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 | Path | Contents |
 | --- | --- |
 | `src/PaneTag.cs` | All helper code: P/Invoke, `Wrapper` (pseudo console, rewriting, bar, threads, pipe), `Program` (arguments) |
-| `PaneTag/` | The module as installed: `PaneTag.psd1`, `PaneTag.psm1`, and the build output `panetag.exe` |
+| `PaneTag/` | The module as installed: `PaneTag.psd1`, `PaneTag.psm1`, and the build output `panetag.exe` plus its `ptag.exe` copy |
 | `tests/PtyHarness.cs`, `tests/smoke.ps1` | Headless smoke tests |
 | `docs/` | Usage, architecture, troubleshooting, development |
 | `build.ps1`, `install.ps1` | Build; build and install to the user's module folders |

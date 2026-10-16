@@ -31,10 +31,10 @@ exit                       # remove the bar
 To rename while claude is running, use a `!` command in Claude Code:
 
 ```
-! panetag --rename Reviewing PR
+! ptag Reviewing PR
 ```
 
-`panetag` is on the PATH inside every titled pane, so this works from any shell there.
+`ptag` is the same command in every shell inside a titled pane (PowerShell, cmd, Git Bash).
 
 No .NET SDK is needed: the helper is compiled with the C# compiler that ships with Windows.
 
