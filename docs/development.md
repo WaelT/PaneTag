@@ -69,6 +69,27 @@ pseudo console renders, with ESC shown as `\e`, BEL as `\a` and CR as `\r`.
 | Pipe rename | Plain words start a bar with that title; the harness renames the bar over the pipe and the new title appears. |
 | Module | `Set-PaneTag -Command` starts a bar; `Set-PaneTag` inside renames it; the exit code (3) reaches the outer shell. |
 | `ptag` inside a pane | From cmd and from Git Bash inside a pane, `ptag New title` works by bare name (checks the PATH change and the `ptag.exe` copy), joins unquoted words and applies `-c`. The Git Bash check is skipped if Git isn't installed. Starting a second bar with `ptag X -- cmd` is refused. |
+| Status | `ptag --status` shows the label in orange; a keypress typed by the harness clears it; `--sticky` survives the keypress until `--clear-status`; outside a pane it's a silent no-op. |
+| Claude hooks | `Enable-PaneTagClaudeHooks` on a temp settings file keeps existing settings and hooks, doesn't duplicate on a second run, backs up under unique names; `Disable-PaneTagClaudeHooks` removes only PaneTag's entries. |
+
+The harness can type into the pane: a sixth argument is sent as keystrokes after 3 s
+(pass `-` as the fifth argument to skip the rename).
+
+### End-to-end check with Claude Code
+
+This runs the real Claude Code with PaneTag's hooks from a temporary settings file (your
+own settings are untouched) and sends one tiny prompt on your account:
+
+```powershell
+$work = "$env:TEMP\panetag-tests"
+Import-Module .\PaneTag\PaneTag.psd1 -Force
+Enable-PaneTagClaudeHooks -SettingsPath "$work\e2e-settings.json"
+$child = "cmd /c `"claude -p `"Reply with just ok`" --settings $work\e2e-settings.json & ping -n 4 127.0.0.1 >nul`""
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($child))
+& "$work\PtyHarness.exe" 80 12 90000 "$PWD\PaneTag\panetag.exe -t E2E --cmd-b64 $b64" | Select-String 'Your turn'
+```
+
+A match means Claude's `Stop` hook flagged the bar.
 
 The harness re-renders through a second pseudo console, so its output shows the resulting
 screen updates rather than the exact bytes `panetag.exe` wrote. For example, margins
@@ -126,5 +147,22 @@ bottom bar:
 
 1. Update `ModuleVersion` in `PaneTag\PaneTag.psd1`.
 2. Add an entry to [CHANGELOG.md](../CHANGELOG.md).
-3. Run `.\tests\smoke.ps1` and the manual checks.
-4. Run `.\install.ps1` to update your installed copy.
+3. Run `.\tests\smoke.ps1` and the manual checks. Push, and check that GitHub Actions passes.
+4. Tag and release on GitHub, attaching a zip of the built module:
+   ```powershell
+   git tag -a v0.3.0 -m "PaneTag 0.3.0"; git push origin v0.3.0
+   Compress-Archive PaneTag\*, LICENSE PaneTag-0.3.0.zip
+   gh release create v0.3.0 PaneTag-0.3.0.zip --title "PaneTag 0.3.0" --notes-file <notes>
+   ```
+5. Publish to the PowerShell Gallery from your own terminal:
+   ```powershell
+   .\tools\publish.ps1
+   ```
+   It installs newer publishing tools if needed (then asks you to rerun it in a new window),
+   builds, runs the smoke tests, stages the module files and asks for your API key with
+   hidden input (or reads `$env:PSGALLERY_API_KEY`). `-WhatIf` does everything but the upload.
+6. Run `.\install.ps1` to update your installed copy, and `Enable-PaneTagClaudeHooks` if you
+   use the Claude Code hooks (they point to `ptag.exe` by path).
+
+The Gallery package contains prebuilt, unsigned `panetag.exe` and `ptag.exe`. Some antivirus
+tools are wary of unsigned executables; signing them is a possible future step.

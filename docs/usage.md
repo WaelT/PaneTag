@@ -37,8 +37,9 @@ To uninstall, delete those two `PaneTag` folders.
 ## `Set-PaneTag` / `ptag`
 
 ```
-Set-PaneTag [[-Title] <string>] [-Color <string>] [-Foreground <string>]
-              [-Position Top|Bottom] [-Command <string>]
+Set-PaneTag [[-Title] <string[]>] [-Color <string>] [-Foreground <string>]
+            [-Position Top|Bottom] [-Command <string>]
+            [-Status <string>] [-StatusColor <string>] [-Sticky] [-ClearStatus]
 ```
 
 What it does depends on where you run it:
@@ -52,11 +53,15 @@ What it does depends on where you run it:
 
 | Parameter | Description |
 | --- | --- |
-| `-Title` | Bar text. Default when starting a bar: the current folder's name. |
+| `-Title` | Bar text. Several words are joined, so quotes are optional. Default when starting a bar: the current folder's name. |
 | `-Color` | Bar background: a color name (see [Colors](#colors)) or `#RRGGBB`. Default: picked from the title text. |
 | `-Foreground` | Text color, same formats. Default: black or white, whichever contrasts better. |
 | `-Position` | `Top` (default) or `Bottom`. Only applies when starting a bar. See [Top or bottom](#top-or-bottom). |
 | `-Command` | Run this command line under the bar instead of a new shell. The bar goes away when the command exits. Only applies when starting a bar. |
+| `-Status` | Flag the bar with a label; see [Status flags](#status-flags). |
+| `-StatusColor` | Color while flagged. Default: `orange`. |
+| `-Sticky` | Keep the status until `-ClearStatus` instead of clearing it on the next keypress. |
+| `-ClearStatus` | Remove the status. |
 
 ### Examples
 
@@ -101,6 +106,72 @@ when starting a bar (`-p`, `--cwd`, or a command after `--`) are refused with
 > Panes started before you upgraded to 0.2.0 don't have `ptag` on their PATH. Type
 > `exit` and start the bar again.
 
+## Status flags
+
+A status temporarily recolors the bar and adds a label, without changing its title or
+color:
+
+```
+ptag --status Your turn                  # orange, "Backend ● Your turn"
+ptag --status Build failed --status-color red --sticky
+ptag --clear-status
+```
+
+- The status **clears on your next keypress in that pane**, so it works as a "look here"
+  signal: once you start typing, it goes away. Mouse clicks, focus changes and pressing only
+  Shift/Ctrl/Alt don't count.
+- `--sticky` keeps it until `--clear-status`.
+- The tab title shows it too: `Backend ● Your turn · Claude Code`.
+- Outside a titled pane, `--status` and `--clear-status` quietly do nothing (exit code 0),
+  so they're safe to call from hooks and scripts that also run elsewhere.
+
+In PowerShell the same options are `-Status`, `-StatusColor`, `-Sticky` and `-ClearStatus`.
+
+## Claude Code: see which agent needs you
+
+With several Claude Code sessions in titled panes, PaneTag can flag the pane whose agent is
+waiting for you:
+
+| When | Bar |
+| --- | --- |
+| Claude finishes and it's your turn | **orange**, `● Your turn` |
+| Claude asks for permission | **red**, `● Needs you` |
+| You type in the pane, or send a prompt | back to normal |
+
+Turn it on once:
+
+```powershell
+Enable-PaneTagClaudeHooks
+```
+
+This adds three [hooks](https://code.claude.com/docs/en/hooks) to your Claude Code user
+settings (`~/.claude/settings.json`):
+
+| Hook | Runs |
+| --- | --- |
+| `Stop` | `ptag.exe --status "Your turn" --status-color orange` |
+| `Notification` (matcher `permission_prompt`) | `ptag.exe --status "Needs you" --status-color red` |
+| `UserPromptSubmit` | `ptag.exe --clear-status` |
+
+Details:
+
+- Your existing settings and hooks are kept, and the file is backed up first
+  (`settings.json.bak-<date>`). Running it again replaces PaneTag's hooks without duplicating them.
+- The hooks call `ptag.exe` from the module folder by full path, with no shell in between,
+  so they work whether Claude Code uses Git Bash or PowerShell. They run in the background
+  (`async`), so Claude never waits for them.
+- In Claude sessions outside a titled pane they do nothing.
+- Choose other colors with `-YourTurnColor` and `-NeedsYouColor`. To enable it for one
+  project only, pass `-SettingsPath .\.claude\settings.json`.
+- **Run it again after upgrading or moving the module**, because the hooks contain the path
+  to `ptag.exe`.
+
+To turn it off:
+
+```powershell
+Disable-PaneTagClaudeHooks
+```
+
 ## `panetag.exe` / `ptag.exe`
 
 ```
@@ -116,6 +187,10 @@ In a pane without a bar it starts one. In a pane with a bar it changes that bar 
 | `-t`, `--title TEXT` | Bar text, as an option (use it when the title starts with `-`). |
 | `-c`, `--color COLOR` | Bar background (name or `#RRGGBB`). Default: picked from the title. |
 | `--fg COLOR` | Text color. Default: black or white for contrast. |
+| `-s`, `--status TEXT` | Flag the bar with a status label (words after it are appended). See [Status flags](#status-flags). |
+| `--status-color COLOR` | Status color. Default: `orange`. |
+| `--sticky` | Keep the status until `--clear-status`. |
+| `--clear-status` | Remove the status. |
 | `-p`, `--position top\|bottom` | Where the bar goes. Default: `top`. |
 | `--cwd DIR` | Working folder for the command. Default: the current folder. |
 | `--cmd CMDLINE` | The full command line as a single string (alternative to `-- command`). |

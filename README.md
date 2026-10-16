@@ -36,6 +36,18 @@ To rename while claude is running, use a `!` command in Claude Code:
 
 `ptag` is the same command in every shell inside a titled pane (PowerShell, cmd, Git Bash).
 
+## Running several Claude Code agents?
+
+Let the bars tell you which one needs you:
+
+```powershell
+Enable-PaneTagClaudeHooks
+```
+
+When Claude finishes, its bar turns **orange** (`● Your turn`); when it asks for permission,
+**red** (`● Needs you`). It goes back to normal as soon as you type in that pane.
+See [Claude Code integration](docs/usage.md#claude-code-see-which-agent-needs-you).
+
 No .NET SDK is needed: the helper is compiled with the C# compiler that ships with Windows.
 
 ## Top or bottom?

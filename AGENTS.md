@@ -21,6 +21,8 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 | `tests/PtyHarness.cs`, `tests/smoke.ps1` | Headless smoke tests |
 | `docs/` | Usage, architecture, troubleshooting, development |
 | `build.ps1`, `install.ps1` | Build; build and install to the user's module folders |
+| `tools/publish.ps1` | Build, test and publish to the PowerShell Gallery (the user runs it) |
+| `.github/workflows/smoke.yml` | Runs `tests/smoke.ps1` on GitHub Actions (Windows PowerShell 5.1) |
 
 ## Commands
 
@@ -30,7 +32,10 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 .\tests\smoke.ps1 -NoBuild    # test without rebuilding
 ```
 
-Don't run `install.ps1` unless the user asks: it writes to their Documents folder.
+Don't run `install.ps1` unless the user asks: it writes to their Documents folder. Never
+run `tools\publish.ps1` (it publishes to the PowerShell Gallery with the user's API key), and
+never edit the user's real `~/.claude/settings.json`; test hooks with `-SettingsPath` on a
+temp file.
 
 ## Hard constraints
 

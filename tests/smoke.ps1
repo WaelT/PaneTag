@@ -22,9 +22,10 @@ function B64([string]$s) { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBy
 function Enc([string]$s) { [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($s)) }
 
 # Runs the harness; command lines are base64-encoded so Windows PowerShell can't mangle quotes.
-function Invoke-Pty([string]$CommandLine, [string]$Rename) {
+function Invoke-Pty([string]$CommandLine, [string]$Rename, [string]$Keys) {
     $harnessArgs = @('60', '10', '15000', $CommandLine)
-    if ($Rename) { $harnessArgs += $Rename }
+    if ($Rename -or $Keys) { if ($Rename) { $harnessArgs += $Rename } else { $harnessArgs += '-' } }
+    if ($Keys) { $harnessArgs += $Keys }
     (& $harness @harnessArgs) -join "`n"
 }
 
@@ -81,6 +82,43 @@ else { Write-Host 'SKIP  ptag renames from Git Bash (Git Bash not installed)' -F
 $child = 'cmd /c "ptag Nested -- cmd /c echo inner || echo REFUSED & ping -n 2 127.0.0.1 >nul"'
 $out = Invoke-Pty "`"$exe`" -t Outer --cmd-b64 $(B64 $child)"
 Check 'second bar in a pane is refused' (($out -match 'already has a bar') -and ($out -match 'REFUSED') -and ($out -notmatch ' Nested ')) $out
+
+# 6. Status: shown in the status color, cleared by the next keypress (the harness types at 3 s).
+#    A bar without a status shows the title directly followed by an escape sequence.
+$child = 'cmd /c "ptag --status Your turn & ping -n 6 127.0.0.1 >nul"'
+$out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 $child)" -Keys 'x'
+$parts = $out -split '<<<TYPED>>>'
+Check 'status is shown in orange' (($parts[0] -match 'Your turn') -and ($parts[0] -match '48;2;217;115;13m')) $out
+Check 'keypress clears the status' (($parts.Count -eq 2) -and ($parts[1] -match ' Before \\e')) $out
+
+# 7. --sticky survives keypresses until --clear-status.
+$child = 'cmd /c "ptag --status Busy --sticky & ping -n 6 127.0.0.1 >nul & echo CLEARING & ptag --clear-status & ping -n 3 127.0.0.1 >nul"'
+$out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 $child)" -Keys 'x'
+$afterKey = ($out -split '<<<TYPED>>>')[-1]
+$beforeClear, $afterClear = $afterKey -split 'CLEARING', 2
+Check 'sticky status survives a keypress' (($out -match 'Busy') -and ($beforeClear -notmatch ' Before \\e')) $out
+Check '--clear-status removes it' ($afterClear -match ' Before \\e') $out
+
+# 8. Status outside a titled pane is a silent no-op (safe in hooks).
+$ErrorActionPreference = 'Continue'
+$err = & $exe --status Nope 2>&1 | Out-String
+$ErrorActionPreference = 'Stop'
+Check 'status outside a pane is a no-op' (($LASTEXITCODE -eq 0) -and -not $err.Trim()) $err
+
+# 9. Claude Code hooks installer keeps existing settings, doesn't duplicate, removes cleanly.
+$settingsFile = Join-Path $work 'settings.json'
+Get-ChildItem "$work\settings.json*" -ErrorAction SilentlyContinue | Remove-Item
+'{"model":"opus","hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo done"}]}]}}' | Set-Content -Encoding ASCII $settingsFile
+Import-Module $module -Force
+Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
+Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
+$s = Get-Content -Raw $settingsFile | ConvertFrom-Json
+$ours = @($s.hooks.Stop) | Where-Object { $_.hooks[0].command -match 'ptag\.exe$' }
+Check 'hooks: added once, existing kept' ((@($s.hooks.Stop).Count -eq 2) -and (@($ours).Count -eq 1) -and ($s.model -eq 'opus') -and ($s.hooks.Notification[0].matcher -eq 'permission_prompt')) ($s | ConvertTo-Json -Depth 10)
+Check 'hooks: original backed up' (@(Get-ChildItem "$settingsFile.bak-*").Count -eq 2) ''
+Disable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
+$s = Get-Content -Raw $settingsFile | ConvertFrom-Json
+Check 'hooks: removed cleanly' ((@($s.hooks.PSObject.Properties).Count -eq 1) -and ($s.hooks.Stop[0].hooks[0].command -eq 'echo done')) ($s | ConvertTo-Json -Depth 10)
 
 if ($failures -gt 0) { throw "$failures check(s) failed" }
 Write-Host 'All smoke tests passed.' -ForegroundColor Green

@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-16
+
+### Added
+
+- Status flags: `ptag --status Your turn` recolors the bar (orange by default) and adds a
+  label until your next keypress in the pane. `--status-color`, `--sticky` and
+  `--clear-status` control it; PowerShell has `-Status`, `-StatusColor`, `-Sticky`,
+  `-ClearStatus`. Outside a titled pane status updates are a silent no-op.
+- `Enable-PaneTagClaudeHooks` / `Disable-PaneTagClaudeHooks`: Claude Code hooks that turn
+  the bar orange ("Your turn") when Claude finishes and red ("Needs you") when it asks for
+  permission. Existing settings are kept and backed up.
+- `ptag Reviewing PR` without quotes now works in PowerShell too.
+- Smoke tests run on GitHub Actions.
+
 ## [0.2.0] - 2026-10-16
 
 ### Added

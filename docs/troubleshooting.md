@@ -59,6 +59,22 @@ Remove-Item Env:PANETAG_PIPE
 ptag 'New title'
 ```
 
+## Claude Code doesn't flag the bar
+
+- Check that the hooks are there: open `~/.claude/settings.json` and look for `ptag.exe`
+  under `Stop` and `Notification`. If not, run `Enable-PaneTagClaudeHooks`.
+- The hooks point to `ptag.exe` by full path. After upgrading, reinstalling or moving the
+  module, run `Enable-PaneTagClaudeHooks` again.
+- Claude must be running **inside a titled pane**. In other panes the hooks do nothing.
+- In Claude Code, `/hooks` shows which hooks are active. Hooks only run if
+  `disableAllHooks` isn't set.
+
+## The status doesn't go away
+
+Non-sticky statuses clear on your next keypress **in that pane**, or when you send Claude a
+prompt. Clicking in the pane or switching to it doesn't count. To clear it by hand:
+`ptag --clear-status` (or `! ptag --clear-status` inside Claude Code).
+
 ## The bar flickers or briefly disappears
 
 The bar is redrawn right after an app clears the screen or switches screens, normally in the

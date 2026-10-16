@@ -279,6 +279,10 @@ namespace PaneTag
 
         static readonly Regex InputReports = new Regex(
             @"\x1b\[(?:<(\d{1,6});(\d{1,6});(\d{1,6})([Mm])|(\??)(\d{1,6});(\d{1,6})(;\d{1,6})?R)", RegexOptions.Compiled);
+        static readonly Regex NonKeyInput = new Regex(
+            @"\x1b\[(?:[IO]|<\d{1,6};\d{1,6};\d{1,6}[Mm]|\??\d{1,6};\d{1,6}(?:;\d{1,6})?R)", RegexOptions.Compiled);
+        static readonly Regex Win32Key = new Regex(
+            @"\x1b\[(\d*);(\d*);(\d*);(\d*);(\d*);(\d*)_", RegexOptions.Compiled);
 
         readonly object gate = new object();
         readonly Options opt;
@@ -294,6 +298,11 @@ namespace PaneTag
         string title, appTitle = "";
         Rgb bg, fg;
         bool colorExplicit, fgExplicit;
+        // Status overlay (e.g. "Your turn" from a Claude Code hook): recolors the bar until
+        // cleared, or until the next keypress in the pane unless sticky.
+        string status = "";
+        Rgb statusBg = new Rgb(0xD9730D);
+        bool statusSticky;
         int rows, cols;
 
         // Terminal state mirrored from the child's output stream.
@@ -511,14 +520,12 @@ namespace PaneTag
                 int n;
                 if (!Native.ReadConsoleW(hIn, buf, buf.Length, out n, IntPtr.Zero)) break;
                 if (n == 0) continue;
-                char[] chars = buf;
-                if (Offset > 0)
-                {
-                    string s = TranslateInput(new string(buf, 0, n));
-                    chars = s.ToCharArray();
-                    n = chars.Length;
-                    if (n == 0) continue;
-                }
+                string s = new string(buf, 0, n);
+                if (status.Length > 0 && !statusSticky && IsKeyInput(s)) ClearStatus();
+                if (Offset > 0) s = TranslateInput(s);
+                char[] chars = s.ToCharArray();
+                n = chars.Length;
+                if (n == 0) continue;
                 var bytes = new byte[encoder.GetByteCount(chars, 0, n, false)];
                 int count = encoder.GetBytes(chars, 0, n, bytes, 0, false);
                 try
@@ -528,6 +535,35 @@ namespace PaneTag
                 }
                 catch (IOException) { break; }
                 catch (ObjectDisposedException) { break; }
+            }
+        }
+
+        // True for real keys/paste; false for focus events, mouse and cursor reports, and
+        // modifier-only or key-up events in win32-input-mode.
+        static bool IsKeyInput(string s)
+        {
+            bool key = false;
+            s = Win32Key.Replace(s, m =>
+            {
+                int vk, down;
+                int.TryParse(m.Groups[1].Value, out vk);
+                int.TryParse(m.Groups[4].Value, out down);
+                if (down == 1 && vk != 16 && vk != 17 && vk != 18 && vk != 20 && vk != 91 && vk != 92) key = true;
+                return "";
+            });
+            return key || NonKeyInput.Replace(s, "").Length > 0;
+        }
+
+        void ClearStatus()
+        {
+            lock (gate)
+            {
+                if (status.Length == 0 || statusSticky) return;
+                status = "";
+                tabDirty = true;
+                MarkDirty(false);
+                var o = new MemoryStream();
+                if (TryFlushHeader(o, true)) WriteOut(o);
             }
         }
 
@@ -635,6 +671,17 @@ namespace PaneTag
                         if (!Colors.TryParse(arg, out c)) return;
                         fg = c;
                         fgExplicit = true;
+                        break;
+                    case "status": // empty text clears it
+                        status = Cells.Sanitize(arg);
+                        tabDirty = true;
+                        break;
+                    case "statuscolor":
+                        if (!Colors.TryParse(arg, out c)) return;
+                        statusBg = c;
+                        break;
+                    case "sticky":
+                        statusSticky = arg.Trim() == "1";
                         break;
                     default:
                         return;
@@ -930,8 +977,11 @@ namespace PaneTag
         {
             // Erase-line with the bar background paints the full width regardless of how
             // the terminal measures the text; the app title is right-aligned with CHA.
-            sb.Append("\x1b[0;1;").Append(fg.Sgr(38)).Append(';').Append(bg.Sgr(48)).Append("m\x1b[2K");
-            string left = Cells.Fit(" " + title + " ", cols);
+            bool flagged = status.Length > 0;
+            Rgb barBg = flagged ? statusBg : bg;
+            Rgb barFg = flagged ? Colors.Contrast(statusBg) : fg;
+            sb.Append("\x1b[0;1;").Append(barFg.Sgr(38)).Append(';').Append(barBg.Sgr(48)).Append("m\x1b[2K");
+            string left = Cells.Fit(" " + title + (flagged ? "  ● " + status : "") + " ", cols);
             sb.Append(left);
             string right = ShortAppTitle();
             int room = cols - Cells.Width(left) - 2;
@@ -955,7 +1005,8 @@ namespace PaneTag
         string TabTitle()
         {
             string app = ShortAppTitle();
-            return app.Length > 0 ? title + " · " + app : title;
+            string t = status.Length > 0 ? title + " ● " + status : title;
+            return app.Length > 0 ? t + " · " + app : t;
         }
 
         static void Emit(MemoryStream o, string s)
@@ -997,16 +1048,25 @@ powershell.exe -NoLogo). In a pane that has a bar, changes that bar instead:
   ptag Reviewing PR          rename
   ptag Reviewing PR -c red   rename and recolor
   ptag -c green              recolor
+  ptag --status Your turn    flag the bar (orange) until the next keypress in the pane
+  ptag --clear-status        remove the flag
 
 Inside a titled pane, ptag is on the PATH, so this works from any shell there,
 including Claude Code's ! commands:  ! ptag Reviewing PR
+--status and --clear-status do nothing outside a titled pane, so they're safe in
+hooks (see Enable-PaneTagClaudeHooks in the PaneTag module).
 
   TITLE...                Title; quotes are optional (default: folder name)
   -t, --title TEXT        Title, as an option
   -c, --color COLOR       Bar background: {0} or #RRGGBB
                           (default: picked from the title)
       --fg COLOR          Bar text color (default: black or white for contrast)
-  -p, --position POS      top (default) or bottom. Use bottom to keep native
+  -s, --status TEXT       Flag the bar with a status label; words are appended
+      --status-color C    Status color (default: orange)
+      --sticky            Keep the status until --clear-status (default: it
+                          clears on the next keypress in the pane)
+      --clear-status      Remove the status
+  -p, --position POS     top (default) or bottom. Use bottom to keep native
                           scrollback: Windows Terminal drops lines that scroll
                           out of a region that doesn't start at the top row.
       --cwd DIR           Working directory for the command
@@ -1027,6 +1087,8 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                 opt.Color = Environment.GetEnvironmentVariable("PANETAG_COLOR");
                 string colorArg = null; // -c as typed, so updates ignore PANETAG_COLOR
                 bool startOnly = false; // an option that only makes sense when starting a bar
+                string statusText = null, statusColor = null;
+                bool sticky = false, clearStatus = false;
 
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -1038,6 +1100,10 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                         case "--title-b64": opt.Title = FromB64(Next(args, ref i)); break;
                         case "-c": case "--color": opt.Color = colorArg = Next(args, ref i); break;
                         case "--fg": opt.Fg = Next(args, ref i); break;
+                        case "-s": case "--status": statusText = Next(args, ref i); break;
+                        case "--status-color": statusColor = Next(args, ref i); break;
+                        case "--sticky": sticky = true; break;
+                        case "--clear-status": clearStatus = true; break;
                         case "-p": case "--position": position = Next(args, ref i); startOnly = true; break;
                         case "--cwd": opt.Cwd = Next(args, ref i); startOnly = true; break;
                         case "--cwd-b64": opt.Cwd = FromB64(Next(args, ref i)); startOnly = true; break;
@@ -1054,16 +1120,39 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                 }
                 if (words.Count > 0)
                 {
-                    if (opt.Title != null) throw new ArgumentException("give the title either as words or with -t, not both");
-                    opt.Title = string.Join(" ", words.ToArray());
+                    string joined = string.Join(" ", words.ToArray());
+                    if (statusText != null) statusText += " " + joined; // ptag --status Your turn
+                    else if (opt.Title != null) throw new ArgumentException("give the title either as words or with -t, not both");
+                    else opt.Title = joined;
                 }
+                bool statusMode = statusText != null || clearStatus || statusColor != null || sticky;
 
-                // Inside a titled pane, change its bar rather than nesting a second one.
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PANETAG_PIPE")))
+                var lines = new List<string>();
+                if (opt.Title != null) lines.Add("title " + OneLine(opt.Title));
+                if (colorArg != null) lines.Add("color " + CheckColor(colorArg));
+                if (opt.Fg != null) lines.Add("fg " + CheckColor(opt.Fg));
+                if (statusText != null)
                 {
+                    lines.Add("statuscolor " + CheckColor(statusColor ?? "orange"));
+                    lines.Add("sticky " + (sticky ? "1" : "0"));
+                    lines.Add("status " + OneLine(statusText));
+                }
+                else if (clearStatus) lines.Add("status ");
+                else if (statusColor != null) CheckColor(statusColor);
+
+                string pipe = Environment.GetEnvironmentVariable("PANETAG_PIPE");
+                if (string.IsNullOrEmpty(pipe))
+                {
+                    // Status updates come from hooks that also run outside titled panes: no-op.
+                    if (statusMode) return 0;
+                }
+                else
+                {
+                    // Inside a titled pane, change its bar rather than nesting a second one.
                     if (startOnly || command.Count > 0)
                         throw new InvalidOperationException("this pane already has a bar; -p, --cwd and a command only apply when starting one (type exit first)");
-                    return SendUpdate(opt.Title, colorArg, opt.Fg);
+                    if (lines.Count == 0) throw new ArgumentException("this pane already has a bar; give a new title, -c, --fg or --status to change it");
+                    return SendUpdate(pipe, lines, statusMode);
                 }
 
                 if (!string.IsNullOrEmpty(position))
@@ -1095,30 +1184,25 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
             }
         }
 
-        // Client side of the rename pipe: sends the changes to the bar of the pane we're in.
-        static int SendUpdate(string title, string color, string fg)
-        {
-            var lines = new List<string>();
-            if (title != null) lines.Add("title " + title.Replace('\r', ' ').Replace('\n', ' '));
-            Rgb unused;
-            if (color != null)
-            {
-                if (!Colors.TryParse(color, out unused)) throw new ArgumentException("unknown color '" + color + "' (use " + Colors.NameList + " or #RRGGBB)");
-                lines.Add("color " + color);
-            }
-            if (fg != null)
-            {
-                if (!Colors.TryParse(fg, out unused)) throw new ArgumentException("unknown color '" + fg + "' (use " + Colors.NameList + " or #RRGGBB)");
-                lines.Add("fg " + fg);
-            }
-            if (lines.Count == 0) throw new ArgumentException("this pane already has a bar; give a new title, -c or --fg to change it");
+        static string OneLine(string s) { return s.Replace('\r', ' ').Replace('\n', ' '); }
 
-            string pipe = Environment.GetEnvironmentVariable("PANETAG_PIPE");
+        static string CheckColor(string spec)
+        {
+            Rgb unused;
+            if (!Colors.TryParse(spec, out unused)) throw new ArgumentException("unknown color '" + spec + "' (use " + Colors.NameList + " or #RRGGBB)");
+            return spec;
+        }
+
+        // Client side of the rename pipe: sends the changes to the bar of the pane we're in.
+        // Quiet mode (status updates from hooks) never fails loudly.
+        static int SendUpdate(string pipe, List<string> lines, bool quiet)
+        {
             using (var client = new NamedPipeClientStream(".", pipe, PipeDirection.Out))
             {
                 try { client.Connect(2000); }
                 catch (TimeoutException)
                 {
+                    if (quiet) return 0;
                     throw new InvalidOperationException("cannot reach this pane's bar (" + pipe + "). If the bar is gone, clear PANETAG_PIPE and start a new one.");
                 }
                 var writer = new StreamWriter(client, new UTF8Encoding(false));

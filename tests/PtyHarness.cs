@@ -1,9 +1,10 @@
 // Test harness: hosts a command in a headless pseudo console and prints everything it
 // renders, with ESC/BEL/CR made visible. Used by smoke.ps1.
 //
-// Usage: PtyHarness.exe <cols> <rows> <timeoutMs> <command line> [rename title]
-//   If a rename title is given, it is sent over panetag's pipe after 1.5 s (the command
-//   must then be panetag.exe itself, since the pipe name uses the direct child's PID).
+// Usage: PtyHarness.exe <cols> <rows> <timeoutMs> <command line> [rename title|-] [keys]
+//   If a rename title is given (not "-"), it is sent over panetag's pipe after 1.5 s (the
+//   command must then be panetag.exe itself, since the pipe name uses the direct child's PID).
+//   If keys are given, they are typed into the pane after 3 s.
 using System;
 using System.IO;
 using System.IO.Pipes;
@@ -96,7 +97,20 @@ static class PtyHarness
         });
         reader.Start();
 
-        if (args.Length > 4)
+        if (args.Length > 5)
+        {
+            var keys = Encoding.UTF8.GetBytes(args[5]);
+            new Thread(() =>
+            {
+                Thread.Sleep(3000);
+                lock (captured) captured.Append("\n<<<TYPED>>>\n");
+                var input = new FileStream(inWrite, FileAccess.Write, 1);
+                input.Write(keys, 0, keys.Length);
+                input.Flush();
+            }).Start();
+        }
+
+        if (args.Length > 4 && args[4] != "-")
         {
             Thread.Sleep(1500);
             try

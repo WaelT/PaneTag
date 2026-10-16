@@ -131,6 +131,17 @@ the terminal contain absolute row numbers that are one too high for the app:
 Input is read with `ReadConsoleW` (UTF-16) and encoded to UTF-8 with a stateful encoder,
 so characters split across reads stay intact.
 
+**Clearing a status on keypress.** When a non-sticky status is set, `InputLoop` checks
+each read with `IsKeyInput` and calls `ClearStatus` on a real key. These don't count as
+keys:
+
+- focus events (`CSI I`, `CSI O`);
+- mouse reports and cursor-position reports;
+- in win32-input-mode (`CSI Vk;Sc;Uc;Kd;Cs;Rc _`), key-up events and key-downs of
+  Shift, Ctrl, Alt, Win and Caps Lock.
+
+Anything else left over (characters, arrows, Enter, paste) counts as a keypress.
+
 ## Rename pipe
 
 When it starts, `panetag.exe` creates the named pipe `\\.\pipe\panetag-<pid>` and
@@ -142,6 +153,9 @@ UTF-8 lines to it:
 | `title <text>` | Change the title (and the automatic color, unless a color was set explicitly). |
 | `color <name or #RRGGBB>` | Change the background. |
 | `fg <name or #RRGGBB>` | Change the text color. |
+| `statuscolor <name or #RRGGBB>` | Color used while a status is set. |
+| `sticky 0` / `sticky 1` | Whether the next status survives keypresses. |
+| `status <text>` | Set the status label; empty text clears it. While set, the bar uses the status color (with contrasting text), shows `title ● status`, and the tab title includes it. |
 
 Unknown lines and invalid colors are ignored. The pipe accepts one client at a time, and
 uses the default security settings, so only the same user can connect.
@@ -152,7 +166,9 @@ There are two clients:
 - `panetag.exe` / `ptag.exe` itself. When `PANETAG_PIPE` is set, `Program.Main` doesn't
   start a bar: `SendUpdate` validates the colors, writes the lines and exits. So it works
   from any shell and starts instantly. Start-only options (`-p`, `--cwd`, a command) are
-  refused there, which also prevents nesting a second bar.
+  refused there, which also prevents nesting a second bar. Status options (`--status`,
+  `--clear-status`) run in quiet mode: outside a titled pane, or if the pipe can't be
+  reached, they exit 0 without output, so Claude Code hooks never report errors.
 
 To make the second one usable by name, the wrapper appends its own folder to `PATH` in
 the environment it passes to the child (`AddSelfToPath`), and `build.ps1` puts a
@@ -167,6 +183,20 @@ Example without either client:
 $p = New-Object IO.Pipes.NamedPipeClientStream('.', $env:PANETAG_PIPE, 'Out')
 $p.Connect(1000); $w = New-Object IO.StreamWriter($p); $w.WriteLine('title Hello'); $w.Dispose()
 ```
+
+## Claude Code hooks
+
+`Enable-PaneTagClaudeHooks` (module) reads Claude Code's `settings.json` with
+`ConvertFrom-Json`, removes any handler whose `command` ends in `ptag.exe` (so re-running
+is idempotent and `Disable-PaneTagClaudeHooks` only touches PaneTag's entries), adds its
+three handlers, backs the file up under a unique name, and writes it back as UTF-8 without
+a BOM. Each handler is in Claude Code's exec form (`command` = full path to `ptag.exe`,
+`args` = the arguments) with `async: true`, so no shell is involved and Claude doesn't wait.
+Hooks inherit Claude's environment, so `ptag.exe` finds `PANETAG_PIPE` when Claude runs
+in a titled pane.
+
+Writing the file with Windows PowerShell's `ConvertTo-Json` changes its formatting
+(indentation, escaped characters), not its content.
 
 ## Startup and exit
 
