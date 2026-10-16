@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-16
+
+### Added
+
+- `panetag --rename TEXT` renames the current pane's bar instantly from any shell in the
+  pane, including Claude Code's `!` commands (`! panetag --rename Reviewing PR`). Quotes
+  are optional; `-c` and `--fg` can be combined with it.
+- `panetag --update` applies `-t`, `-c` and `--fg` to the current pane's bar.
+- Inside a titled pane, `panetag` is on the PATH, so both work by name.
+- Demo GIF in the README.
+
 ## [0.1.0] - 2026-10-15
 
 First release.

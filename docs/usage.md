@@ -74,10 +74,42 @@ ptag -Foreground '#000000'                   # change the text color
 The exit code of the shell or command is passed back, so `$LASTEXITCODE` works after
 `ptag -Command ...`.
 
+## Renaming while an app is running
+
+While claude, codex or another app is running, you can't type `ptag` in that pane.
+Instead, use `panetag --rename` from **any shell inside the pane**. Every titled pane has
+`panetag` on its PATH, so it works from PowerShell, cmd, and Git Bash (which Claude Code's
+`!` commands use). It's instant: no PowerShell needs to start.
+
+In Claude Code, type:
+
+```
+! panetag --rename Reviewing PR
+! panetag --rename Reviewing PR -c red
+! panetag --update -c green
+```
+
+Quotes are optional: all words after `--rename` become the title. You can also just ask
+Claude to "rename this pane to Reviewing PR with panetag --rename".
+
+| Command | Effect |
+| --- | --- |
+| `panetag --rename TEXT` | Rename the bar |
+| `panetag --rename TEXT -c COLOR --fg COLOR` | Rename and recolor |
+| `panetag --update -c COLOR` | Recolor only |
+| `panetag --update --fg COLOR` | Change the text color only |
+
+Outside a titled pane these print `not inside a PaneTag pane` and exit with code 1.
+
+> Panes started before you upgraded to 0.2.0 don't have `panetag` on their PATH. Type
+> `exit` and start the bar again, or call `panetag.exe` by its full path.
+
 ## `panetag.exe`
 
 ```
 panetag [options] [--] [command [args...]]
+panetag --rename TEXT [-c COLOR] [--fg COLOR]
+panetag --update [-t TEXT] [-c COLOR] [--fg COLOR]
 ```
 
 | Option | Description |
@@ -89,6 +121,8 @@ panetag [options] [--] [command [args...]]
 | `--cwd DIR` | Working folder for the command. Default: the current folder. |
 | `--cmd CMDLINE` | The full command line as a single string (alternative to trailing arguments). |
 | `--title-b64`, `--cwd-b64`, `--cmd-b64` | Same as above, but base64-encoded UTF-8. The module uses these to avoid Windows PowerShell's quoting bugs. |
+| `--rename TEXT` | Inside a titled pane: rename its bar, then exit. Extra words are appended to the title. See [Renaming while an app is running](#renaming-while-an-app-is-running). |
+| `--update` | Inside a titled pane: apply `-t`, `-c` and `--fg` to its bar, then exit. |
 | `-h`, `--help` | Show help. |
 
 Everything after the options (or after `--`) is the command to run. Without a command it
@@ -109,7 +143,8 @@ The exit code is the command's exit code, or `1` if `panetag.exe` itself failed 
 | --- | --- | --- |
 | `PANETAG_POSITION` | You | Default position (`top` or `bottom`) when none is given. |
 | `PANETAG_COLOR` | You | Default bar color when none is given. |
-| `PANETAG_PIPE` | `panetag.exe` | Set inside a titled pane. Names the pipe that `Set-PaneTag` uses to rename the bar. Don't set it yourself. |
+| `PANETAG_PIPE` | `panetag.exe` | Set inside a titled pane. Names the pipe that `Set-PaneTag` and `panetag --rename` use to update the bar. Don't set it yourself. |
+| `PATH` | `panetag.exe` | Inside a titled pane, `panetag.exe`'s folder is added to the end of `PATH`, so `panetag` works by name. Your PATH outside the pane is not changed. |
 
 ## Colors
 

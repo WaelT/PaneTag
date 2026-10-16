@@ -67,6 +67,7 @@ pseudo console renders, with ESC shown as `\e`, BEL as `\a` and CR as `\r`.
 | Alternate screen | The bar is drawn; the app sees 9 rows; text the app puts on its row 1 lands on row 2; the bar is redrawn after entering the alternate screen, clearing it and leaving it; the exit code (7) passes through. |
 | Pipe rename | The harness renames the bar over the pipe and the new title appears. |
 | Module | `Set-PaneTag -Command` starts a bar; `Set-PaneTag` inside renames it; the exit code (3) reaches the outer shell. |
+| `--rename` | From cmd and from Git Bash inside a pane, `panetag --rename` works by bare name (checks the PATH change), joins unquoted words and applies `-c`. The Git Bash check is skipped if Git isn't installed. Outside a pane it exits 1 with a clear message. |
 
 The harness re-renders through a second pseudo console, so its output shows the resulting
 screen updates rather than the exact bytes `panetag.exe` wrote. For example, margins

@@ -354,6 +354,7 @@ namespace PaneTag
         {
             pipeName = "panetag-" + System.Diagnostics.Process.GetCurrentProcess().Id;
             Environment.SetEnvironmentVariable("PANETAG_PIPE", pipeName);
+            AddSelfToPath();
 
             SafeFileHandle inRead, inWrite, outRead, outWrite;
             if (!Native.CreatePipe(out inRead, out inWrite, IntPtr.Zero, 0) || !Native.CreatePipe(out outRead, out outWrite, IntPtr.Zero, 0))
@@ -393,6 +394,19 @@ namespace PaneTag
             Native.ClosePseudoConsole(hPC);
             output.Join(3000);
             return (int)code;
+        }
+
+        // Makes `panetag --rename` callable from any shell in the pane (bash, cmd, Claude
+        // Code's ! commands) without changing the user's PATH outside it.
+        static void AddSelfToPath()
+        {
+            string dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string entry in path.Split(';'))
+            {
+                if (string.Equals(entry.TrimEnd('\\'), dir.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return;
+            }
+            Environment.SetEnvironmentVariable("PATH", path.TrimEnd(';') + ";" + dir);
         }
 
         static Thread StartThread(ThreadStart body, bool background)
@@ -975,6 +989,8 @@ namespace PaneTag
 @"panetag - keeps a title bar on a terminal pane, even under full-screen apps.
 
 Usage: panetag [options] [--] [command [args...]]
+       panetag --rename TEXT [-c COLOR] [--fg COLOR]
+       panetag --update [-t TEXT] [-c COLOR] [--fg COLOR]
 
   -t, --title TEXT        Title text (default: current folder name)
   -c, --color COLOR       Bar background: {0} or #RRGGBB
@@ -985,12 +1001,16 @@ Usage: panetag [options] [--] [command [args...]]
                           out of a region that doesn't start at the top row.
       --cwd DIR           Working directory for the command
       --cmd CMDLINE       Full command line as one string
+      --rename TEXT       Inside a titled pane: rename its bar and exit.
+                          Extra words are appended, so quotes are optional.
+      --update            Inside a titled pane: apply -t/-c/--fg to its bar and exit
   -h, --help              Show this help
 
 The command defaults to 'powershell.exe -NoLogo'. Defaults can also come from the
-PANETAG_POSITION and PANETAG_COLOR environment variables. Inside the pane,
-PANETAG_PIPE names a pipe that accepts 'title <text>' / 'color <spec>' lines
-(use Set-PaneTag from the PaneTag module).";
+PANETAG_POSITION and PANETAG_COLOR environment variables. Inside a titled pane,
+panetag is on the PATH and PANETAG_PIPE names the pipe that --rename/--update
+(and Set-PaneTag from the PaneTag module) talk to, so this works from any shell,
+including Claude Code's ! commands:  ! panetag --rename Reviewing PR";
 
         static int Main(string[] args)
         {
@@ -1000,6 +1020,8 @@ PANETAG_PIPE names a pipe that accepts 'title <text>' / 'color <spec>' lines
                 var command = new List<string>();
                 string position = Environment.GetEnvironmentVariable("PANETAG_POSITION");
                 opt.Color = Environment.GetEnvironmentVariable("PANETAG_COLOR");
+                string colorArg = null; // -c as typed, so --update ignores PANETAG_COLOR
+                bool update = false;
 
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -1009,7 +1031,9 @@ PANETAG_PIPE names a pipe that accepts 'title <text>' / 'color <spec>' lines
                     {
                         case "-t": case "--title": opt.Title = Next(args, ref i); break;
                         case "--title-b64": opt.Title = FromB64(Next(args, ref i)); break;
-                        case "-c": case "--color": opt.Color = Next(args, ref i); break;
+                        case "-c": case "--color": opt.Color = colorArg = Next(args, ref i); break;
+                        case "--rename": opt.Title = Next(args, ref i); update = true; break;
+                        case "--update": update = true; break;
                         case "--fg": opt.Fg = Next(args, ref i); break;
                         case "-p": case "--position": position = Next(args, ref i); break;
                         case "--cwd": opt.Cwd = Next(args, ref i); break;
@@ -1026,6 +1050,8 @@ PANETAG_PIPE names a pipe that accepts 'title <text>' / 'color <spec>' lines
                             break;
                     }
                 }
+
+                if (update) return SendUpdate(opt.Title, colorArg, opt.Fg, command);
 
                 if (!string.IsNullOrEmpty(position))
                 {
@@ -1054,6 +1080,38 @@ PANETAG_PIPE names a pipe that accepts 'title <text>' / 'color <spec>' lines
                 Console.Error.WriteLine("panetag: " + ex.Message);
                 return 1;
             }
+        }
+
+        // Client side of the rename pipe: sends the changes to the bar of the pane we're in.
+        static int SendUpdate(string title, string color, string fg, List<string> words)
+        {
+            if (words.Count > 0) title = (title == null ? "" : title + " ") + string.Join(" ", words.ToArray());
+            var lines = new List<string>();
+            if (title != null) lines.Add("title " + title.Replace('\r', ' ').Replace('\n', ' '));
+            Rgb unused;
+            if (color != null)
+            {
+                if (!Colors.TryParse(color, out unused)) throw new ArgumentException("unknown color '" + color + "' (use " + Colors.NameList + " or #RRGGBB)");
+                lines.Add("color " + color);
+            }
+            if (fg != null)
+            {
+                if (!Colors.TryParse(fg, out unused)) throw new ArgumentException("unknown color '" + fg + "' (use " + Colors.NameList + " or #RRGGBB)");
+                lines.Add("fg " + fg);
+            }
+            if (lines.Count == 0) throw new ArgumentException("nothing to change: give a title, -c or --fg");
+
+            string pipe = Environment.GetEnvironmentVariable("PANETAG_PIPE");
+            if (string.IsNullOrEmpty(pipe)) throw new InvalidOperationException("not inside a PaneTag pane (PANETAG_PIPE is not set)");
+            using (var client = new NamedPipeClientStream(".", pipe, PipeDirection.Out))
+            {
+                try { client.Connect(2000); }
+                catch (TimeoutException) { throw new InvalidOperationException("cannot reach this pane's bar (" + pipe + ")"); }
+                var writer = new StreamWriter(client, new UTF8Encoding(false));
+                foreach (string line in lines) writer.WriteLine(line);
+                writer.Flush();
+            }
+            return 0;
         }
 
         static string Next(string[] args, ref int i)

@@ -146,7 +146,18 @@ UTF-8 lines to it:
 Unknown lines and invalid colors are ignored. The pipe accepts one client at a time, and
 uses the default security settings, so only the same user can connect.
 
-Example without the module:
+There are two clients:
+
+- `Set-PaneTag` in the module writes to the pipe directly from PowerShell.
+- `panetag --rename` / `panetag --update` (`Program.SendUpdate`) validates the colors,
+  writes the lines and exits, without starting a pseudo console. So it works from any
+  shell and starts instantly.
+
+To make the second one usable by name, the wrapper appends its own folder to `PATH` in
+the environment it passes to the child (`AddSelfToPath`). Every process in the pane,
+including Git Bash started by Claude Code, inherits both `PATH` and `PANETAG_PIPE`.
+
+Example without either client:
 
 ```powershell
 $p = New-Object IO.Pipes.NamedPipeClientStream('.', $env:PANETAG_PIPE, 'Out')

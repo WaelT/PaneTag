@@ -23,10 +23,18 @@ Then, in any pane:
 
 ```powershell
 ptag 'Backend API'         # add a bar (starts a fresh shell under it)
+ptag 'Backend (debug)'     # rename it
 claude                     # the bar stays
-ptag 'Backend (debug)'     # rename from inside the pane
 exit                       # remove the bar
 ```
+
+To rename while claude is running, use a `!` command in Claude Code:
+
+```
+! panetag --rename Reviewing PR
+```
+
+`panetag` is on the PATH inside every titled pane, so this works from any shell there.
 
 No .NET SDK is needed: the helper is compiled with the C# compiler that ships with Windows.
 

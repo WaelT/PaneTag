@@ -35,9 +35,20 @@ $env:PANETAG_POSITION = 'bottom'   # in $PROFILE to make it the default
 
 See [architecture.md](architecture.md#scrollback) for why.
 
+## `panetag: not inside a PaneTag pane`
+
+`panetag --rename` and `--update` only work in a pane that has a bar, because they need the
+`PANETAG_PIPE` variable that the bar sets. Start a bar first with `ptag`.
+
+## `panetag` is not recognized inside a titled pane
+
+The pane's bar was started by a version before 0.2.0, which didn't add `panetag` to the
+pane's PATH. Type `exit`, then start the bar again. Or call it by its full path:
+`(Get-Module -ListAvailable PaneTag).ModuleBase + '\panetag.exe'`.
+
 ## Renaming does nothing, or "Cannot reach this pane's title bar"
 
-`Set-PaneTag` renames through the pipe named in `$env:PANETAG_PIPE`. That fails if
+`Set-PaneTag` and `panetag --rename` rename through the pipe named in `$env:PANETAG_PIPE`. That fails if
 the variable was inherited by a process that outlived its bar (for example a shell started
 from a titled pane and then moved elsewhere). Clear it and start a new bar:
 

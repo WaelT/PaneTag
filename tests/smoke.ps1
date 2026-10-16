@@ -58,5 +58,28 @@ Check 'module starts the bar' ($out -match ' Module Test ') $out
 Check 'module renames from inside' ($out -match ' Renamed Inside ') $out
 Check 'module returns exit code' ($out -match 'outer exit=3') $out
 
+# 4. panetag --rename by bare name (the pane puts panetag on PATH), unquoted words, with a color.
+$child = 'cmd /c "panetag --rename Via Cmd -c red & ping -n 3 127.0.0.1 >nul"'
+$out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 $child)"
+Check '--rename from cmd' (($out -match ' Via Cmd ') -and ($out -match '48;2;207;34;46m')) $out
+
+$bash = Join-Path $env:ProgramFiles 'Git\bin\bash.exe'
+if (Test-Path $bash) {
+    $child = "`"$bash`" -c `"panetag --rename Via Bash; sleep 2`""
+    $out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 $child)"
+    Check '--rename from Git Bash (Claude Code ! commands)' ($out -match ' Via Bash ') $out
+}
+else { Write-Host 'SKIP  --rename from Git Bash (Git Bash not installed)' -ForegroundColor Yellow }
+
+# 5. --rename outside a titled pane fails cleanly.
+$savedPipe = $env:PANETAG_PIPE
+Remove-Item Env:PANETAG_PIPE -ErrorAction SilentlyContinue
+$ErrorActionPreference = 'Continue' # PS 5.1 turns native stderr into a terminating error under 'Stop'
+$err = & $exe --rename Nope 2>&1 | Out-String
+$ErrorActionPreference = 'Stop'
+Check '--rename outside a pane exits 1' (($LASTEXITCODE -eq 1) -and ($err -match 'not inside a PaneTag pane')) $err
+if ($savedPipe) { $env:PANETAG_PIPE = $savedPipe }
+
 if ($failures -gt 0) { throw "$failures check(s) failed" }
 Write-Host 'All smoke tests passed.' -ForegroundColor Green
+exit 0
