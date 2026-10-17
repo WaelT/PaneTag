@@ -3,8 +3,9 @@
 #   .\tools\publish.ps1            # asks for the API key (input hidden)
 #   .\tools\publish.ps1 -WhatIf    # everything except the upload
 #
-# The key can also come from $env:PSGALLERY_API_KEY. Run this in your own terminal so the
-# key never leaves it. Create a key at https://www.powershellgallery.com/account/apikeys
+# The key can also come from $env:PSGALLERY_API_KEY, or from a PSGALLERY_API_KEY=... line
+# in .env at the repo root (gitignored). Run this in your own terminal so the key never
+# leaves it. Create a key at https://www.powershellgallery.com/account/apikeys
 # (scope: "Push new packages and package versions", glob pattern: PaneTag).
 #
 # Uses PSResourceGet rather than PowerShellGet 2.x: PowerShellGet packs with `dotnet pack`
@@ -19,6 +20,17 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 $root = Split-Path -Parent $PSScriptRoot
+
+# Value of NAME=value in a .env file: '#' comments, optional quotes, $null if absent.
+function Read-DotEnv([string]$Path, [string]$Name) {
+    if (-not (Test-Path $Path)) { return $null }
+    foreach ($line in Get-Content $Path) {
+        if ($line -match "^\s*$Name\s*=\s*(.*?)\s*$") {
+            return $Matches[1].Trim('"', "'")
+        }
+    }
+    return $null
+}
 
 # 1. Publishing tool.
 if (-not (Get-Module -ListAvailable Microsoft.PowerShell.PSResourceGet)) {
@@ -55,6 +67,7 @@ if ($PSCmdlet.ShouldProcess("PaneTag $version", "Publish to $Repository")) {
     $publish = @{ Path = $stage; Repository = $Repository }
     if ($Repository -eq 'PSGallery') {
         $key = $env:PSGALLERY_API_KEY
+        if (-not $key) { $key = Read-DotEnv (Join-Path $root '.env') 'PSGALLERY_API_KEY' }
         if (-not $key) {
             $secure = Read-Host 'PowerShell Gallery API key' -AsSecureString
             $key = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))

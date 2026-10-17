@@ -197,7 +197,8 @@ Terminal, taking every open tab with it.
    ```
    It installs [PSResourceGet](https://learn.microsoft.com/powershell/gallery/powershellget/overview)
    for your user if needed, builds, runs the smoke tests, stages the module files and asks
-   for your API key with hidden input (or reads `$env:PSGALLERY_API_KEY`). `-WhatIf` does
+   for your API key with hidden input. To skip the prompt, set `$env:PSGALLERY_API_KEY` or
+   put `PSGALLERY_API_KEY=<key>` in a `.env` file at the repo root (gitignored). `-WhatIf` does
    everything but the upload. For a dry run without a key, publish to a local folder:
    `Register-PSResourceRepository -Name Local -Uri C:\temp\repo -Trusted`, then
    `.\tools\publish.ps1 -Repository Local`.
