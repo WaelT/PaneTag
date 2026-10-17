@@ -7,7 +7,11 @@ $root = Split-Path -Parent $PSScriptRoot
 if (-not $NoBuild) { & (Join-Path $root 'build.ps1') }
 
 # Inside a titled pane panetag would update that bar instead of starting test bars.
+# Restored in the finally block at the end, so running the tests in your own titled pane
+# doesn't break ptag there.
+$savedPipe = $env:PANETAG_PIPE
 Remove-Item Env:PANETAG_PIPE -ErrorAction SilentlyContinue
+try {
 
 $exe = Join-Path $root 'PaneTag\panetag.exe'
 $module = Join-Path $root 'PaneTag\PaneTag.psd1'
@@ -123,3 +127,7 @@ Check 'hooks: removed cleanly' ((@($s.hooks.PSObject.Properties).Count -eq 1) -a
 if ($failures -gt 0) { throw "$failures check(s) failed" }
 Write-Host 'All smoke tests passed.' -ForegroundColor Green
 exit 0
+}
+finally {
+    $env:PANETAG_PIPE = $savedPipe
+}

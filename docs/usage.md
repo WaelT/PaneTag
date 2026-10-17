@@ -262,12 +262,14 @@ same color every time. Renaming a bar re-picks the color unless you set one expl
 
 ## What the bar shows
 
-- **Left, bold:** your title.
+- **Left, bold:** your title, followed by `● status` while a [status](#status-flags) is set
+  (the whole bar then takes the status color).
 - **Right:** the running app's own window title, for example `✳ Claude Code` or `powershell`.
   It's hidden when the bar is too narrow or when it matches your title.
 
-The Windows Terminal **tab title** becomes `Your title · app title`, so the tab shows the
-focused pane's title. When the bar is removed, the original tab title is restored.
+The Windows Terminal **tab title** becomes `Your title · app title` (with `● status` after
+your title while one is set), so the tab shows the focused pane's title. When the bar is
+removed, the original tab title is restored.
 
 ## Top or bottom
 

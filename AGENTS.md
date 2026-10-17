@@ -22,6 +22,8 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 | `docs/` | Usage, architecture, troubleshooting, development |
 | `build.ps1`, `install.ps1` | Build; build and install to the user's module folders |
 | `tools/publish.ps1` | Build, test and publish to the PowerShell Gallery (the user runs it) |
+| `tools/demo/` | `play.ps1` plays the README demo full screen for the user to record; `scene.ps1` runs each pane |
+| `docs/assets/panetag-demo.gif` | The README demo (renamed from `demo.gif` to bust GitHub's image cache) |
 | `.github/workflows/smoke.yml` | Runs `tests/smoke.ps1` on GitHub Actions (Windows PowerShell 5.1) |
 
 ## Commands
@@ -69,6 +71,31 @@ temp file.
    relevant manual checks from [docs/development.md](docs/development.md#manual-checks-in-windows-terminal)
    for the user and say that they weren't run. Don't claim visual behavior you haven't seen.
 3. Clean up stray `panetag` / `PtyHarness` processes left by failed tests.
+
+## Gotchas learned the hard way
+
+- **Never close or capture Windows Terminal windows from another process.** Posting
+  `WM_CLOSE` to a WT window crashed WindowsTerminal.exe, and all WT windows share one
+  process, so every open tab died (including the user's Claude sessions). Capturing a WT
+  window by title gives black frames (GPU rendering), and a background script can't bring a
+  window to the front, so screen-area capture records whatever is on top, e.g. the user's
+  browser. Demos are recorded by the user (`tools/demo/play.ps1`); demo panes close
+  themselves via a stop file.
+- **Don't kill `claude.exe` by name.** The current Claude Code session and the user's
+  other sessions are `claude.exe` too. Match on something unique in the command line (the
+  demo uses its temp folder path), and check process ancestry if unsure.
+- **The agent may itself run inside a titled pane**, so `PANETAG_PIPE` can be set in its
+  shell. Clear it before ad-hoc `panetag.exe` runs, or they update the user's bar instead
+  of starting a test bar.
+- **Windows PowerShell mangles double quotes in native arguments**, including
+  `git commit -m` and `gh --jq`: use `git commit -F <file>`, `--notes-file`, and parse
+  `gh ... --json` output with `ConvertFrom-Json`.
+- **Under `$ErrorActionPreference = 'Stop'`, native stderr is a terminating error** in
+  Windows PowerShell; scripts that run native tools (ffmpeg, git) switch to `'Continue'`
+  around them.
+- **The user's machine:** Documents is redirected to OneDrive; .NET runtimes but no SDK
+  (hence PSResourceGet for publishing); ffmpeg via winget (`%LOCALAPPDATA%\Microsoft\WinGet\Links`);
+  PaneTag is installed from the PowerShell Gallery (versioned module folder).
 
 ## Keeping docs in sync
 

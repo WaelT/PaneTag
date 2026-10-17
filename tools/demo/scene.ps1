@@ -1,4 +1,4 @@
-# One pane of the demo recording (see record.ps1). Runs inside panetag.exe.
+# One pane of the demo recording (see play.ps1). Runs inside panetag.exe.
 param([Parameter(Mandatory = $true)][string]$Scene, [Parameter(Mandatory = $true)][string]$Work)
 $ErrorActionPreference = 'Continue'
 Import-Module (Join-Path $PSScriptRoot '..\..\PaneTag\PaneTag.psd1') -Force

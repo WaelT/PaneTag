@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- New README demo (`docs/assets/panetag-demo.gif`) showing status flags and the Claude
+  Code hooks; `tools/demo/play.ps1` plays the scene for recording by hand.
+- `tools/publish.ps1` publishes with PSResourceGet instead of PowerShellGet, which fails
+  with "dotnet.exe failed to pack" on machines with the .NET runtime but no SDK.
+- Docs: installing from the PowerShell Gallery, badges, and Windows Terminal examples that
+  look up the (versioned) module folder.
+
+### Fixed
+
+- `tests/smoke.ps1` restores `PANETAG_PIPE` when it finishes, so running the tests inside
+  your own titled pane no longer breaks `ptag` there.
+
 ## [0.3.0] - 2026-10-16
 
 ### Added
