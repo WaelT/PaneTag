@@ -60,7 +60,7 @@ If you use the [Claude Code hooks](#claude-code-see-which-agent-needs-you), run
 ```
 Set-PaneTag [[-Title] <string[]>] [-Color <string>] [-Foreground <string>]
             [-Position Top|Bottom] [-Command <string>]
-            [-Status <string>] [-StatusColor <string>] [-Sticky] [-ClearStatus]
+            [-Status <string>] [-StatusColor <string>] [-Sticky] [-Timer] [-ClearStatus]
 ```
 
 What it does depends on where you run it:
@@ -82,6 +82,7 @@ What it does depends on where you run it:
 | `-Status` | Flag the bar with a label; see [Status flags](#status-flags). |
 | `-StatusColor` | Color while flagged. Default: `orange`. |
 | `-Sticky` | Keep the status until `-ClearStatus` instead of clearing it on the next keypress. |
+| `-Timer` | Show how long the status has been up (`· 4m`) after the first minute. |
 | `-ClearStatus` | Remove the status. |
 
 ### Examples
@@ -135,6 +136,7 @@ color:
 ```
 ptag --status Your turn                  # orange, "Backend ● Your turn"
 ptag --status Build failed --status-color red --sticky
+ptag --status Deploying --timer           # "Backend ● Deploying · 4m" after 4 minutes
 ptag --clear-status
 ```
 
@@ -142,11 +144,14 @@ ptag --clear-status
   signal: once you start typing, it goes away. Mouse clicks, focus changes and pressing only
   Shift/Ctrl/Alt don't count.
 - `--sticky` keeps it until `--clear-status`.
+- `--timer` adds how long it has been up once a minute has passed (`· 4m`, `· 1h 05m`),
+  updated every minute. Raising the same status again keeps its age.
 - The tab title shows it too: `Backend ● Your turn · Claude Code`.
 - Outside a titled pane, `--status` and `--clear-status` quietly do nothing (exit code 0),
   so they're safe to call from hooks and scripts that also run elsewhere.
 
-In PowerShell the same options are `-Status`, `-StatusColor`, `-Sticky` and `-ClearStatus`.
+In PowerShell the same options are `-Status`, `-StatusColor`, `-Sticky`, `-Timer` and
+`-ClearStatus`.
 
 ## Claude Code: see which agent needs you
 
@@ -159,6 +164,9 @@ waiting for you:
 | Claude asks for permission | **red**, `● Needs you` |
 | You type in the pane, send a prompt, or Claude starts working again on its own | back to normal |
 
+After a minute the flag shows how long it has been waiting (`● Needs you · 4m`), so when
+several panes are flagged you can go to the one that has waited longest first.
+
 Turn it on once:
 
 ```powershell
@@ -170,8 +178,8 @@ settings (`~/.claude/settings.json`):
 
 | Hook | Runs |
 | --- | --- |
-| `Stop` | `ptag.exe --status "Your turn" --status-color orange` |
-| `Notification` (matcher `permission_prompt`) | `ptag.exe --status "Needs you" --status-color red` |
+| `Stop` | `ptag.exe --status "Your turn" --status-color orange --timer` |
+| `Notification` (matcher `permission_prompt`) | `ptag.exe --status "Needs you" --status-color red --timer` |
 | `UserPromptSubmit` | `ptag.exe --clear-status` |
 | `PreToolUse` | `ptag.exe --clear-status` (Claude resumed without a prompt: a background task finished, `/loop`, a scheduled run) |
 
@@ -213,6 +221,7 @@ In a pane without a bar it starts one. In a pane with a bar it changes that bar 
 | `-s`, `--status TEXT` | Flag the bar with a status label (words after it are appended). See [Status flags](#status-flags). |
 | `--status-color COLOR` | Status color. Default: `orange`. |
 | `--sticky` | Keep the status until `--clear-status`. |
+| `--timer` | Show how long the status has been up (`· 4m`) after the first minute. |
 | `--clear-status` | Remove the status. |
 | `-p`, `--position top\|bottom` | Where the bar goes. Default: `top`. |
 | `--cwd DIR` | Working folder for the command. Default: the current folder. |

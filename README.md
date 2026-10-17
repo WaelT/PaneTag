@@ -51,7 +51,8 @@ Enable-PaneTagClaudeHooks
 ```
 
 When Claude finishes, its bar turns **orange** (`● Your turn`); when it asks for permission,
-**red** (`● Needs you`). It goes back to normal as soon as you type in that pane.
+**red** (`● Needs you`). After a minute it shows how long it has waited (`· 4m`), so you
+know which pane to visit first. It goes back to normal as soon as you type in that pane.
 See [Claude Code integration](docs/usage.md#claude-code-see-which-agent-needs-you).
 
 ## Top or bottom?

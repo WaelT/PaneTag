@@ -316,6 +316,11 @@ namespace PaneTag
         // order. Each carries its process creation time (FILETIME); older ones are dropped,
         // and so is a non-sticky status raised before the last keypress.
         long statusStamp, keyStamp;
+        // With a timer the label grows "· 4m" once a minute has passed, so with several
+        // flagged panes you can tell which has waited longest. statusSince is UTC FILETIME.
+        bool statusTimer;
+        long statusSince, pendingSince; // pendingSince: the current pipe batch's start time
+        int drawnMinutes;
         int rows, cols;
 
         // Terminal state mirrored from the child's output stream.
@@ -623,11 +628,17 @@ namespace PaneTag
                         childTop = childBottom = 0;
                         MarkDirty(true);
                     }
+                    bool tick = statusTimer && status.Length > 0 && StatusMinutes() != drawnMinutes;
+                    if (tick)
+                    {
+                        tabDirty = true;
+                        MarkDirty(false);
+                    }
                     bool stale = (headerDirty || marginsDirty || tabDirty) && (DateTime.UtcNow - dirtySince).TotalMilliseconds > 250;
-                    if (resized || stale)
+                    if (resized || stale || tick)
                     {
                         var o = new MemoryStream();
-                        if (TryFlushHeader(o, true)) WriteOut(o);
+                        if (TryFlushHeader(o, resized || stale)) WriteOut(o);
                     }
                 }
             }
@@ -677,12 +688,13 @@ namespace PaneTag
                 // Clients without a stamp (Set-PaneTag, older ptag) are applied as they come.
                 bool stale = stamp != 0 && (stamp < statusStamp || (raises && !sticky && stamp < keyStamp));
                 if (stamp != 0 && !stale) statusStamp = stamp;
+                Native.GetSystemTimePreciseAsFileTime(out pendingSince); // a "timer" line overrides it
                 bool changed = false;
                 foreach (string line in lines)
                 {
                     string verb, arg;
                     SplitCommand(line, out verb, out arg);
-                    if (stale && (verb == "status" || verb == "statuscolor" || verb == "sticky")) continue;
+                    if (stale && (verb == "status" || verb == "statuscolor" || verb == "sticky" || verb == "timer")) continue;
                     if (ApplyCommand(verb, arg)) changed = true;
                 }
                 if (!changed) return;
@@ -726,9 +738,15 @@ namespace PaneTag
                     fgExplicit = true;
                     return true;
                 case "status": // empty text clears it
-                    status = Cells.Sanitize(arg);
+                {
+                    string s = Cells.Sanitize(arg);
+                    // Raising the same flag again (another permission prompt) keeps its age.
+                    if (s != status) statusSince = pendingSince;
+                    else statusSince = Math.Min(statusSince, pendingSince);
+                    status = s;
                     tabDirty = true;
                     return true;
+                }
                 case "statuscolor":
                     if (!Colors.TryParse(arg, out c)) return false;
                     statusBg = c;
@@ -736,6 +754,14 @@ namespace PaneTag
                 case "sticky":
                     statusSticky = arg.Trim() == "1";
                     return true;
+                case "timer": // "timer <FILETIME the flag was raised>", or "timer 0" for none
+                {
+                    long since;
+                    long.TryParse(arg.Trim(), out since);
+                    statusTimer = since > 0;
+                    if (statusTimer) pendingSince = since;
+                    return true;
+                }
                 default:
                     return false;
             }
@@ -1030,7 +1056,8 @@ namespace PaneTag
             Rgb barBg = flagged ? statusBg : bg;
             Rgb barFg = flagged ? Colors.Contrast(statusBg) : fg;
             sb.Append("\x1b[0;1;").Append(barFg.Sgr(38)).Append(';').Append(barBg.Sgr(48)).Append("m\x1b[2K");
-            string left = Cells.Fit(" " + title + (flagged ? "  ● " + status : "") + " ", cols);
+            drawnMinutes = StatusMinutes();
+            string left = Cells.Fit(" " + title + (flagged ? "  ● " + StatusLabel() : "") + " ", cols);
             sb.Append(left);
             string right = ShortAppTitle();
             int room = cols - Cells.Width(left) - 2;
@@ -1054,8 +1081,23 @@ namespace PaneTag
         string TabTitle()
         {
             string app = ShortAppTitle();
-            string t = status.Length > 0 ? title + " ● " + status : title;
+            string t = status.Length > 0 ? title + " ● " + StatusLabel() : title;
             return app.Length > 0 ? t + " · " + app : t;
+        }
+
+        int StatusMinutes()
+        {
+            long now;
+            Native.GetSystemTimePreciseAsFileTime(out now);
+            return (int)Math.Max(0, (now - statusSince) / TimeSpan.TicksPerMinute);
+        }
+
+        // "Needs you · 4m", "Needs you · 1h 05m"; nothing added in the first minute.
+        string StatusLabel()
+        {
+            int m = StatusMinutes();
+            if (!statusTimer || m < 1) return status;
+            return status + " · " + (m < 60 ? m + "m" : (m / 60) + "h " + (m % 60).ToString("00") + "m");
         }
 
         static void Emit(MemoryStream o, string s)
@@ -1114,6 +1156,8 @@ hooks (see Enable-PaneTagClaudeHooks in the PaneTag module).
       --status-color C    Status color (default: orange)
       --sticky            Keep the status until --clear-status (default: it
                           clears on the next keypress in the pane)
+      --timer             Show how long the status has been up (· 4m) after
+                          the first minute
       --clear-status      Remove the status
   -p, --position POS     top (default) or bottom. Use bottom to keep native
                           scrollback: Windows Terminal drops lines that scroll
@@ -1137,7 +1181,7 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                 string colorArg = null; // -c as typed, so updates ignore PANETAG_COLOR
                 bool startOnly = false; // an option that only makes sense when starting a bar
                 string statusText = null, statusColor = null;
-                bool sticky = false, clearStatus = false;
+                bool sticky = false, timer = false, clearStatus = false;
 
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -1152,6 +1196,7 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                         case "-s": case "--status": statusText = Next(args, ref i); break;
                         case "--status-color": statusColor = Next(args, ref i); break;
                         case "--sticky": sticky = true; break;
+                        case "--timer": timer = true; break;
                         case "--clear-status": clearStatus = true; break;
                         case "-p": case "--position": position = Next(args, ref i); startOnly = true; break;
                         case "--cwd": opt.Cwd = Next(args, ref i); startOnly = true; break;
@@ -1174,7 +1219,7 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                     else if (opt.Title != null) throw new ArgumentException("give the title either as words or with -t, not both");
                     else opt.Title = joined;
                 }
-                bool statusMode = statusText != null || clearStatus || statusColor != null || sticky;
+                bool statusMode = statusText != null || clearStatus || statusColor != null || sticky || timer;
 
                 var lines = new List<string>();
                 if (opt.Title != null) lines.Add("title " + OneLine(opt.Title));
@@ -1184,6 +1229,7 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                 {
                     lines.Add("statuscolor " + CheckColor(statusColor ?? "orange"));
                     lines.Add("sticky " + (sticky ? "1" : "0"));
+                    lines.Add("timer " + (timer ? StartStamp() : 0));
                     lines.Add("status " + OneLine(statusText));
                 }
                 else if (clearStatus) lines.Add("status ");

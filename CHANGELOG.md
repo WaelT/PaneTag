@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+### Added
+
+- Status timer: `ptag --status ... --timer` (`-Timer` in PowerShell) shows how long the
+  status has been up once a minute has passed (`● Needs you · 4m`, `· 1h 05m`), so with
+  several flagged panes you can tell which has waited longest. The Claude Code hooks use
+  it for "Your turn" and "Needs you"; run `Enable-PaneTagClaudeHooks` again to get it.
+
+### Fixed
+
+- The smoke tests for out-of-order status updates (0.3.1) built their pipe lines wrongly
+  and passed without testing anything. They now check the behavior, with positive controls.
+
 ## [0.3.1] - 2026-10-17
 
 ### Changed

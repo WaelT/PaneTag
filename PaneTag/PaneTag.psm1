@@ -71,6 +71,9 @@ function Set-PaneTag {
         # Keep the status until -ClearStatus instead of clearing it on the next keypress.
         [switch]$Sticky,
 
+        # Show how long the status has been up ("· 4m") after the first minute.
+        [switch]$Timer,
+
         # Remove the status.
         [switch]$ClearStatus
     )
@@ -90,6 +93,7 @@ function Set-PaneTag {
         if ($Status) {
             $lines += "statuscolor $StatusColor"
             if ($Sticky) { $lines += 'sticky 1' } else { $lines += 'sticky 0' }
+            if ($Timer) { $lines += 'timer ' + [DateTime]::UtcNow.ToFileTimeUtc() } else { $lines += 'timer 0' }
             $lines += "status $Status"
         }
         elseif ($ClearStatus) { $lines += 'status ' }
@@ -177,7 +181,9 @@ Adds four hooks to Claude Code's user settings (~/.claude/settings.json by defau
   Notification (permission_prompt) -> bar shows "Needs you" (red)
   UserPromptSubmit               -> status cleared
   PreToolUse                     -> status cleared (Claude is working again)
-The status also clears on your next keypress in the pane. The hooks run ptag.exe from this
+Both flags show how long they've been up after the first minute ("Needs you · 4m"), so with
+several flagged panes you can see which has waited longest. The status also clears on
+your next keypress in the pane. The hooks run ptag.exe from this
 module's folder directly (no shell) and in the background, and do nothing when Claude isn't
 running in a titled pane. Existing settings are kept and backed up first. Running it again
 replaces PaneTag's hooks; run it again after moving or upgrading the module.
@@ -209,8 +215,8 @@ function Enable-PaneTagClaudeHooks {
         [pscustomobject]@{ type = 'command'; command = $script:HookExe; args = $HandlerArgs; async = $true }
     }
     $add = [ordered]@{
-        Stop             = [pscustomobject]@{ hooks = @(New-Handler @('--status', 'Your turn', '--status-color', $YourTurnColor)) }
-        Notification     = [pscustomobject]@{ matcher = 'permission_prompt'; hooks = @(New-Handler @('--status', 'Needs you', '--status-color', $NeedsYouColor)) }
+        Stop             = [pscustomobject]@{ hooks = @(New-Handler @('--status', 'Your turn', '--status-color', $YourTurnColor, '--timer')) }
+        Notification     = [pscustomobject]@{ matcher = 'permission_prompt'; hooks = @(New-Handler @('--status', 'Needs you', '--status-color', $NeedsYouColor, '--timer')) }
         UserPromptSubmit = [pscustomobject]@{ hooks = @(New-Handler @('--clear-status')) }
         # Claude also starts working without a prompt (background task done, /loop, cron).
         PreToolUse       = [pscustomobject]@{ hooks = @(New-Handler @('--clear-status')) }

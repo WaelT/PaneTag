@@ -106,12 +106,32 @@ Check '--clear-status removes it' ($afterClear -match ' Before \\e') $out
 # 7b. Stamped status updates (async hooks) apply in stamp order, not arrival order, and a
 #     non-sticky status stamped before the last keypress (the harness types at 3 s) is dropped.
 $send = 'function Send($l) { $p = New-Object IO.Pipes.NamedPipeClientStream(''.'', $env:PANETAG_PIPE, ''Out''); $p.Connect(2000); $w = New-Object IO.StreamWriter($p); $l | ForEach-Object { $w.WriteLine($_) }; $w.Dispose() }; '
+#     (Parenthesize 'stamp ' + n: PowerShell's comma binds tighter than +.)
 $inner = $send + '$t = [DateTime]::UtcNow.ToFileTimeUtc(); ' +
-         'Send @(''stamp '' + ($t + 2), ''status ''); Send @(''stamp '' + ($t + 1), ''status Stale''); ' +
-         'Write-Host ORDERED; Start-Sleep 4; Send @(''stamp '' + $t, ''status Late''); Start-Sleep 1; Write-Host DONE'
+         'Send @((''stamp '' + ($t - 2)), ''status ''); Send @((''stamp '' + ($t - 3)), ''status Stale''); ' +
+         'Send @((''stamp '' + ($t - 1)), ''status Fresh''); Start-Sleep 4; ' +
+         'Send @((''stamp '' + $t), ''status Late''); Start-Sleep -Milliseconds 500; ' +
+         'Send @((''stamp '' + [DateTime]::UtcNow.ToFileTimeUtc()), ''status After''); Start-Sleep 1'
 $out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 "powershell -NoProfile -EncodedCommand $(Enc $inner)")" -Keys 'x'
-Check 'older status update is dropped' (($out -match 'ORDERED') -and ($out -notmatch 'Stale')) $out
-Check 'status from before a keypress is dropped' (($out -match 'DONE') -and ($out -notmatch 'Late')) $out
+Check 'older status update is dropped' (($out -match 'Fresh') -and ($out -notmatch 'Stale')) $out
+Check 'status from before a keypress is dropped' (($out -match 'After') -and ($out -notmatch 'Late')) $out
+
+# 7c. --timer: the label shows the age after a minute, keeps it when the same status is
+#     raised again, uses hours past 60 minutes, and is absent without a timer.
+$inner = $send + '$m = [TimeSpan]::TicksPerMinute; $t = [DateTime]::UtcNow.ToFileTimeUtc(); ' +
+         'Send @((''timer '' + ($t - 5 * $m)), ''status Needs you''); Start-Sleep -Milliseconds 500; ' +
+         'Send @((''timer '' + $t), ''status Needs you''); Start-Sleep -Milliseconds 500; ' +
+         'Send @((''timer '' + ($t - 65 * $m)), ''status Waiting''); Start-Sleep -Milliseconds 500; ' +
+         'Send @(''timer 0'', ''status Plain''); Start-Sleep -Milliseconds 500; ' +
+         'Send @((''timer '' + ([DateTime]::UtcNow.ToFileTimeUtc() - 595000000)), ''status Ticking''); Start-Sleep 2'
+$out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 "powershell -NoProfile -EncodedCommand $(Enc $inner)")"
+Check 'timer shows minutes' ($out -match 'Needs you \S{1,3} 5m') $out
+Check 'raising the same status keeps its age' ((([regex]::Matches($out, 'Needs you \S{1,3} 5m')).Count -ge 2) -and ($out -notmatch 'Needs you \\e')) $out
+Check 'timer shows hours' ($out -match 'Waiting \S{1,3} 1h 05m') $out
+Check 'no timer without --timer' ($out -match 'Plain \\e') $out
+Check 'timer ticks over by itself' (($out -match 'Ticking \\e') -and ($out -match 'Ticking \S{1,3} 1m')) $out
+$err = & $exe --status x --timer 2>&1 | Out-String
+Check '--timer is accepted' (($LASTEXITCODE -eq 0) -and -not $err.Trim()) $err
 
 # 8. Status outside a titled pane is a silent no-op (safe in hooks).
 $ErrorActionPreference = 'Continue'
@@ -128,7 +148,7 @@ Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 $s = Get-Content -Raw $settingsFile | ConvertFrom-Json
 $ours = @($s.hooks.Stop) | Where-Object { $_.hooks[0].command -match 'ptag\.exe$' }
-Check 'hooks: added once, existing kept' ((@($s.hooks.Stop).Count -eq 2) -and (@($ours).Count -eq 1) -and ($s.model -eq 'opus') -and ($s.hooks.Notification[0].matcher -eq 'permission_prompt') -and ($s.hooks.PreToolUse[0].hooks[0].args -contains '--clear-status')) ($s | ConvertTo-Json -Depth 10)
+Check 'hooks: added once, existing kept' ((@($s.hooks.Stop).Count -eq 2) -and (@($ours).Count -eq 1) -and ($s.model -eq 'opus') -and ($s.hooks.Notification[0].matcher -eq 'permission_prompt') -and ($s.hooks.PreToolUse[0].hooks[0].args -contains '--clear-status') -and ($s.hooks.Notification[0].hooks[0].args -contains '--timer')) ($s | ConvertTo-Json -Depth 10)
 Check 'hooks: original backed up' (@(Get-ChildItem "$settingsFile.bak-*").Count -eq 2) ''
 Disable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 $s = Get-Content -Raw $settingsFile | ConvertFrom-Json

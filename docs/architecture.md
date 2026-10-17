@@ -155,6 +155,7 @@ UTF-8 lines to it:
 | `fg <name or #RRGGBB>` | Change the text color. |
 | `statuscolor <name or #RRGGBB>` | Color used while a status is set. |
 | `sticky 0` / `sticky 1` | Whether the next status survives keypresses. |
+| `timer <FILETIME>` / `timer 0` | Whether the next status shows its age, counted from that UTC time (the client's start). |
 | `status <text>` | Set the status label; empty text clears it. While set, the bar uses the status color (with contrasting text), shows `title ● status`, and the tab title includes it. |
 | `stamp <FILETIME>` | Orders this client's status lines (see below). |
 
@@ -170,6 +171,13 @@ unlike the time `Main` is reached). The wrapper drops a client's `status`, `stat
 and `sticky` lines if its stamp is older than the last applied one, or if it raises a
 non-sticky status and is older than the last keypress. Clients without a stamp
 (`Set-PaneTag`, older `ptag.exe`) are applied as they arrive.
+
+**Status timer.** With `timer`, `StatusLabel` appends the age (`· 4m`, `· 1h 05m`) once a
+minute has passed. The start time comes from the client, so the age counts from when the
+hook fired, and the tests can send an old one instead of waiting. A `status` line with the
+same text as the current one keeps the earlier start (a second permission prompt doesn't
+reset it). `PollLoop` redraws the bar and tab title when the minute changes
+(`drawnMinutes`).
 
 There are two clients:
 
