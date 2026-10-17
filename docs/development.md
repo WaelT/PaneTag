@@ -158,9 +158,16 @@ bottom bar:
    ```powershell
    .\tools\publish.ps1
    ```
-   It installs newer publishing tools if needed (then asks you to rerun it in a new window),
-   builds, runs the smoke tests, stages the module files and asks for your API key with
-   hidden input (or reads `$env:PSGALLERY_API_KEY`). `-WhatIf` does everything but the upload.
+   It installs [PSResourceGet](https://learn.microsoft.com/powershell/gallery/powershellget/overview)
+   for your user if needed, builds, runs the smoke tests, stages the module files and asks
+   for your API key with hidden input (or reads `$env:PSGALLERY_API_KEY`). `-WhatIf` does
+   everything but the upload. For a dry run without a key, publish to a local folder:
+   `Register-PSResourceRepository -Name Local -Uri C:\temp\repo -Trusted`, then
+   `.\tools\publish.ps1 -Repository Local`.
+
+   It uses PSResourceGet's `Publish-PSResource`, not PowerShellGet's `Publish-Module`:
+   PowerShellGet 2.2.5 packs with `dotnet pack` whenever `dotnet.exe` is on PATH, and fails
+   with "dotnet.exe failed to pack" on machines that have the .NET runtime but no SDK.
 6. Run `.\install.ps1` to update your installed copy, and `Enable-PaneTagClaudeHooks` if you
    use the Claude Code hooks (they point to `ptag.exe` by path).
 
