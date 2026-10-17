@@ -7,7 +7,7 @@ Persistent title bars for Windows Terminal panes. The bar stays put while you ru
 full-screen and interactive apps such as `claude`, `codex` or `edit`, so you can always
 tell which pane is which.
 
-![Four Windows Terminal panes titled with ptag; two run Claude Code and keep their bars](docs/assets/demo.gif)
+![Four Windows Terminal panes with PaneTag bars: Frontend turns orange (Your turn) when Claude finishes, Backend turns red (Needs you) at a permission prompt, Tests renames itself to 9 passing, and Logs shows a 3 errors status](docs/assets/demo.gif)
 
 Each bar shows your title on the left and the running app's own title on the right.
 

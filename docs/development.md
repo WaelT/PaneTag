@@ -143,6 +143,26 @@ bottom bar:
 - **Module code** must stay compatible with Windows PowerShell 5.1: no ternary operator,
   `??`, `?.` or `&&`/`||` pipeline chains.
 
+## Recording the demo GIF
+
+`tools\demo\play.ps1` plays the README demo in a full-screen, 4-pane Windows Terminal
+window; `tools\demo\scene.ps1` is what each pane runs. Two panes run real Claude Code
+sessions (two small prompts) with a temporary settings file that only holds PaneTag's hooks.
+
+1. Run `.\tools\demo\play.ps1` and start your screen recorder during the countdown.
+2. Don't touch the demo window. It closes by itself after `-Seconds` (default 45): the scenes
+   exit on a stop file and the demo's Claude sessions are ended, so every pane exits normally.
+3. Convert the recording, for example:
+   ```powershell
+   ffmpeg -i demo.mp4 -an -filter_complex "fps=10,scale=1720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" docs\assets\demo.gif
+   ```
+
+Don't automate the capture or close the window from outside: Windows won't bring a window
+to the front for a background script (so a screen-area capture can record whatever is on
+top), capturing the window by title gives black frames because Windows Terminal draws with
+the GPU, and closing a Windows Terminal window from another process crashed Windows
+Terminal, taking every open tab with it.
+
 ## Releasing
 
 1. Update `ModuleVersion` in `PaneTag\PaneTag.psd1`.
