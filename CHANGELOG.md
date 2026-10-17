@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-17
+
 ### Changed
 
 - New README demo (`docs/assets/panetag-demo.gif`) showing status flags and the Claude

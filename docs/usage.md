@@ -46,7 +46,7 @@ PowerShell loads the module automatically the first time you type `ptag` or
 `Set-PaneTag`, so you don't need to edit your profile. Open a new pane after installing.
 
 To find where it was installed (Gallery installs use a versioned folder such as
-`PaneTag\0.3.0`, and Documents may be redirected to OneDrive):
+`PaneTag\0.3.1`, and Documents may be redirected to OneDrive):
 
 ```powershell
 (Get-Module -ListAvailable PaneTag).ModuleBase
@@ -294,7 +294,7 @@ Join-Path (Get-Module -ListAvailable PaneTag | Select-Object -First 1).ModuleBas
 ```
 
 The JSON examples use the from-source location; a Gallery install adds a version folder
-(`...\Modules\PaneTag\0.3.0\panetag.exe`), so update the path after upgrading.
+(`...\Modules\PaneTag\0.3.1\panetag.exe`), so update the path after upgrading.
 
 ### A profile that always has a bar
 
