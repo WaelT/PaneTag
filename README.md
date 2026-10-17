@@ -12,7 +12,9 @@ tell which pane is which.
 Each bar shows your title on the left and the running app's own title on the right.
 
 Windows Terminal has no per-pane titles of its own, and apps overwrite the tab title.
-PaneTag reserves one row of the pane for a bar that apps can't draw over.
+PaneTag reserves one row of the pane for a bar that apps can't draw over: think of the
+per-pane title bars in iTerm2 or kitty, for Windows Terminal
+([alternatives](docs/alternatives.md)).
 
 ## Quick start
 
@@ -71,7 +73,9 @@ $env:PANETAG_POSITION = 'bottom'   # in your $PROFILE, to make it the default
 | [docs/architecture.md](docs/architecture.md) | How it works: pseudo console, escape-sequence rewriting, threads, pipe protocol |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common problems and fixes |
 | [docs/development.md](docs/development.md) | Building, testing and changing the code |
+| [docs/alternatives.md](docs/alternatives.md) | Similar tools on Windows and macOS, and how PaneTag differs |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Reporting bugs and contributing changes |
 | [AGENTS.md](AGENTS.md) | Instructions for coding agents working on this repo |
 
 ## Requirements

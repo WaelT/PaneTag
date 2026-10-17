@@ -13,6 +13,8 @@ All notable changes to this project are documented here. Versions follow
   with "dotnet.exe failed to pack" on machines with the .NET runtime but no SDK.
 - Docs: installing from the PowerShell Gallery, badges, and Windows Terminal examples that
   look up the (versioned) module folder.
+- Docs: `docs/alternatives.md` (similar tools on Windows and macOS) and `CONTRIBUTING.md`
+  (how to report bugs and contribute; contributions are MIT-licensed, no ownership transfer).
 
 ### Fixed
 
