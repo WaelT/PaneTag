@@ -154,7 +154,7 @@ sessions (two small prompts) with a temporary settings file that only holds Pane
    exit on a stop file and the demo's Claude sessions are ended, so every pane exits normally.
 3. Convert the recording, for example:
    ```powershell
-   ffmpeg -i demo.mp4 -an -filter_complex "fps=10,scale=1720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" docs\assets\demo.gif
+   ffmpeg -i demo.mp4 -an -filter_complex "fps=10,scale=1720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" docs\assets\panetag-demo.gif
    ```
 
 Don't automate the capture or close the window from outside: Windows won't bring a window
