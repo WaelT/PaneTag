@@ -1,3 +1,6 @@
 # Build output (users build it with build.ps1 / install.ps1)
 *.exe
 *.pdb
+
+# Local secrets (PowerShell Gallery API key)
+.env

@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-17
+
 ### Added
 
 - Status timer: `ptag --status ... --timer` (`-Timer` in PowerShell) shows how long the
