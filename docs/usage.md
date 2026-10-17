@@ -157,7 +157,7 @@ waiting for you:
 | --- | --- |
 | Claude finishes and it's your turn | **orange**, `● Your turn` |
 | Claude asks for permission | **red**, `● Needs you` |
-| You type in the pane, or send a prompt | back to normal |
+| You type in the pane, send a prompt, or Claude starts working again on its own | back to normal |
 
 Turn it on once:
 
@@ -165,7 +165,7 @@ Turn it on once:
 Enable-PaneTagClaudeHooks
 ```
 
-This adds three [hooks](https://code.claude.com/docs/en/hooks) to your Claude Code user
+This adds four [hooks](https://code.claude.com/docs/en/hooks) to your Claude Code user
 settings (`~/.claude/settings.json`):
 
 | Hook | Runs |
@@ -173,6 +173,7 @@ settings (`~/.claude/settings.json`):
 | `Stop` | `ptag.exe --status "Your turn" --status-color orange` |
 | `Notification` (matcher `permission_prompt`) | `ptag.exe --status "Needs you" --status-color red` |
 | `UserPromptSubmit` | `ptag.exe --clear-status` |
+| `PreToolUse` | `ptag.exe --clear-status` (Claude resumed without a prompt: a background task finished, `/loop`, a scheduled run) |
 
 Details:
 
@@ -180,7 +181,8 @@ Details:
   (`settings.json.bak-<date>`). Running it again replaces PaneTag's hooks without duplicating them.
 - The hooks call `ptag.exe` from the module folder by full path, with no shell in between,
   so they work whether Claude Code uses Git Bash or PowerShell. They run in the background
-  (`async`), so Claude never waits for them.
+  (`async`), so Claude never waits for them. The bar applies their updates in the order
+  Claude fired them, even when they arrive out of order.
 - In Claude sessions outside a titled pane they do nothing.
 - Choose other colors with `-YourTurnColor` and `-NeedsYouColor`. To enable it for one
   project only, pass `-SettingsPath .\.claude\settings.json`.

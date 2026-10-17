@@ -131,9 +131,9 @@ the terminal contain absolute row numbers that are one too high for the app:
 Input is read with `ReadConsoleW` (UTF-16) and encoded to UTF-8 with a stateful encoder,
 so characters split across reads stay intact.
 
-**Clearing a status on keypress.** When a non-sticky status is set, `InputLoop` checks
-each read with `IsKeyInput` and calls `ClearStatus` on a real key. These don't count as
-keys:
+**Clearing a status on keypress.** `InputLoop` checks each read with `IsKeyInput` and
+calls `OnKey` on a real key, which records the time (`keyStamp`, see the `stamp` line
+below) and clears a non-sticky status. These don't count as keys:
 
 - focus events (`CSI I`, `CSI O`);
 - mouse reports and cursor-position reports;
@@ -156,9 +156,20 @@ UTF-8 lines to it:
 | `statuscolor <name or #RRGGBB>` | Color used while a status is set. |
 | `sticky 0` / `sticky 1` | Whether the next status survives keypresses. |
 | `status <text>` | Set the status label; empty text clears it. While set, the bar uses the status color (with contrasting text), shows `title ● status`, and the tab title includes it. |
+| `stamp <FILETIME>` | Orders this client's status lines (see below). |
 
 Unknown lines and invalid colors are ignored. The pipe accepts one client at a time, and
-uses the default security settings, so only the same user can connect.
+uses the default security settings, so only the same user can connect. A client's lines
+are read until it disconnects and then applied together (`ApplyCommands`).
+
+**Ordering status updates.** Claude Code's hooks are async, so a `Stop` and the
+`UserPromptSubmit` or `PreToolUse` right after it run as separate `ptag.exe` processes
+that can reach the pipe in either order. `ptag.exe` therefore sends `stamp` with its own
+process creation time (`GetProcessTimes`; it follows the order the hooks were fired in,
+unlike the time `Main` is reached). The wrapper drops a client's `status`, `statuscolor`
+and `sticky` lines if its stamp is older than the last applied one, or if it raises a
+non-sticky status and is older than the last keypress. Clients without a stamp
+(`Set-PaneTag`, older `ptag.exe`) are applied as they arrive.
 
 There are two clients:
 
@@ -189,7 +200,8 @@ $p.Connect(1000); $w = New-Object IO.StreamWriter($p); $w.WriteLine('title Hello
 `Enable-PaneTagClaudeHooks` (module) reads Claude Code's `settings.json` with
 `ConvertFrom-Json`, removes any handler whose `command` ends in `ptag.exe` (so re-running
 is idempotent and `Disable-PaneTagClaudeHooks` only touches PaneTag's entries), adds its
-three handlers, backs the file up under a unique name, and writes it back as UTF-8 without
+four handlers (`PreToolUse` clears the status because Claude can start working again
+without a prompt, e.g. when a background task finishes), backs the file up under a unique name, and writes it back as UTF-8 without
 a BOM. Each handler is in Claude Code's exec form (`command` = full path to `ptag.exe`,
 `args` = the arguments) with `async: true`, so no shell is involved and Claude doesn't wait.
 Hooks inherit Claude's environment, so `ptag.exe` finds `PANETAG_PIPE` when Claude runs

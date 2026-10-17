@@ -73,7 +73,7 @@ pseudo console renders, with ESC shown as `\e`, BEL as `\a` and CR as `\r`.
 | Pipe rename | Plain words start a bar with that title; the harness renames the bar over the pipe and the new title appears. |
 | Module | `Set-PaneTag -Command` starts a bar; `Set-PaneTag` inside renames it; the exit code (3) reaches the outer shell. |
 | `ptag` inside a pane | From cmd and from Git Bash inside a pane, `ptag New title` works by bare name (checks the PATH change and the `ptag.exe` copy), joins unquoted words and applies `-c`. The Git Bash check is skipped if Git isn't installed. Starting a second bar with `ptag X -- cmd` is refused. |
-| Status | `ptag --status` shows the label in orange; a keypress typed by the harness clears it; `--sticky` survives the keypress until `--clear-status`; outside a pane it's a silent no-op. |
+| Status | `ptag --status` shows the label in orange; a keypress typed by the harness clears it; `--sticky` survives the keypress until `--clear-status`; stamped updates apply in stamp order and one stamped before the keypress is dropped; outside a pane it's a silent no-op. |
 | Claude hooks | `Enable-PaneTagClaudeHooks` on a temp settings file keeps existing settings and hooks, doesn't duplicate on a second run, backs up under unique names; `Disable-PaneTagClaudeHooks` removes only PaneTag's entries. |
 
 The harness can type into the pane: a sixth argument is sent as keystrokes after 3 s

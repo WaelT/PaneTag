@@ -103,6 +103,16 @@ $beforeClear, $afterClear = $afterKey -split 'CLEARING', 2
 Check 'sticky status survives a keypress' (($out -match 'Busy') -and ($beforeClear -notmatch ' Before \\e')) $out
 Check '--clear-status removes it' ($afterClear -match ' Before \\e') $out
 
+# 7b. Stamped status updates (async hooks) apply in stamp order, not arrival order, and a
+#     non-sticky status stamped before the last keypress (the harness types at 3 s) is dropped.
+$send = 'function Send($l) { $p = New-Object IO.Pipes.NamedPipeClientStream(''.'', $env:PANETAG_PIPE, ''Out''); $p.Connect(2000); $w = New-Object IO.StreamWriter($p); $l | ForEach-Object { $w.WriteLine($_) }; $w.Dispose() }; '
+$inner = $send + '$t = [DateTime]::UtcNow.ToFileTimeUtc(); ' +
+         'Send @(''stamp '' + ($t + 2), ''status ''); Send @(''stamp '' + ($t + 1), ''status Stale''); ' +
+         'Write-Host ORDERED; Start-Sleep 4; Send @(''stamp '' + $t, ''status Late''); Start-Sleep 1; Write-Host DONE'
+$out = Invoke-Pty "`"$exe`" -t Before --cmd-b64 $(B64 "powershell -NoProfile -EncodedCommand $(Enc $inner)")" -Keys 'x'
+Check 'older status update is dropped' (($out -match 'ORDERED') -and ($out -notmatch 'Stale')) $out
+Check 'status from before a keypress is dropped' (($out -match 'DONE') -and ($out -notmatch 'Late')) $out
+
 # 8. Status outside a titled pane is a silent no-op (safe in hooks).
 $ErrorActionPreference = 'Continue'
 $err = & $exe --status Nope 2>&1 | Out-String
@@ -118,7 +128,7 @@ Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 Enable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 $s = Get-Content -Raw $settingsFile | ConvertFrom-Json
 $ours = @($s.hooks.Stop) | Where-Object { $_.hooks[0].command -match 'ptag\.exe$' }
-Check 'hooks: added once, existing kept' ((@($s.hooks.Stop).Count -eq 2) -and (@($ours).Count -eq 1) -and ($s.model -eq 'opus') -and ($s.hooks.Notification[0].matcher -eq 'permission_prompt')) ($s | ConvertTo-Json -Depth 10)
+Check 'hooks: added once, existing kept' ((@($s.hooks.Stop).Count -eq 2) -and (@($ours).Count -eq 1) -and ($s.model -eq 'opus') -and ($s.hooks.Notification[0].matcher -eq 'permission_prompt') -and ($s.hooks.PreToolUse[0].hooks[0].args -contains '--clear-status')) ($s | ConvertTo-Json -Depth 10)
 Check 'hooks: original backed up' (@(Get-ChildItem "$settingsFile.bak-*").Count -eq 2) ''
 Disable-PaneTagClaudeHooks -SettingsPath $settingsFile | Out-Null
 $s = Get-Content -Raw $settingsFile | ConvertFrom-Json

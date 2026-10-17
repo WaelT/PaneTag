@@ -18,6 +18,14 @@ All notable changes to this project are documented here. Versions follow
 
 ### Fixed
 
+- "Your turn" stayed up while Claude was working again without a prompt (a background
+  task or agent finished, `/loop`, a scheduled run) until you pressed a key.
+  `Enable-PaneTagClaudeHooks` now also adds a `PreToolUse` hook that clears the status;
+  run it again to get it.
+- Async hooks fired close together (e.g. `Stop`, then a queued prompt) could reach the bar
+  out of order and leave a stale status. `ptag.exe` now stamps status updates with its
+  process creation time and the bar drops older ones, plus non-sticky statuses raised
+  before your last keypress.
 - `tests/smoke.ps1` restores `PANETAG_PIPE` when it finishes, so running the tests inside
   your own titled pane no longer breaks `ptag` there.
 

@@ -71,8 +71,10 @@ ptag 'New title'
 
 ## The status doesn't go away
 
-Non-sticky statuses clear on your next keypress **in that pane**, or when you send Claude a
-prompt. Clicking in the pane or switching to it doesn't count. To clear it by hand:
+Non-sticky statuses clear on your next keypress **in that pane**, when you send Claude a
+prompt, or when Claude next uses a tool. Clicking in the pane or switching to it doesn't
+count. If "Your turn" stays up while Claude works on its own (a finished background task,
+`/loop`), your hooks predate the `PreToolUse` one: run `Enable-PaneTagClaudeHooks` again. To clear it by hand:
 `ptag --clear-status` (or `! ptag --clear-status` inside Claude Code).
 
 ## The bar flickers or briefly disappears

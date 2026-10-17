@@ -172,10 +172,11 @@ function Save-ClaudeSettings($Settings, [string]$Path) {
 Adds Claude Code hooks that flag the pane's bar when Claude needs you.
 
 .DESCRIPTION
-Adds three hooks to Claude Code's user settings (~/.claude/settings.json by default):
+Adds four hooks to Claude Code's user settings (~/.claude/settings.json by default):
   Stop                           -> bar shows "Your turn" (orange)
   Notification (permission_prompt) -> bar shows "Needs you" (red)
   UserPromptSubmit               -> status cleared
+  PreToolUse                     -> status cleared (Claude is working again)
 The status also clears on your next keypress in the pane. The hooks run ptag.exe from this
 module's folder directly (no shell) and in the background, and do nothing when Claude isn't
 running in a titled pane. Existing settings are kept and backed up first. Running it again
@@ -211,6 +212,8 @@ function Enable-PaneTagClaudeHooks {
         Stop             = [pscustomobject]@{ hooks = @(New-Handler @('--status', 'Your turn', '--status-color', $YourTurnColor)) }
         Notification     = [pscustomobject]@{ matcher = 'permission_prompt'; hooks = @(New-Handler @('--status', 'Needs you', '--status-color', $NeedsYouColor)) }
         UserPromptSubmit = [pscustomobject]@{ hooks = @(New-Handler @('--clear-status')) }
+        # Claude also starts working without a prompt (background task done, /loop, cron).
+        PreToolUse       = [pscustomobject]@{ hooks = @(New-Handler @('--clear-status')) }
     }
     foreach ($event in $add.Keys) {
         $groups = @()
@@ -220,7 +223,7 @@ function Enable-PaneTagClaudeHooks {
     }
 
     Save-ClaudeSettings $settings $SettingsPath
-    Write-Host "PaneTag hooks enabled in $SettingsPath (Stop, Notification, UserPromptSubmit)."
+    Write-Host "PaneTag hooks enabled in $SettingsPath (Stop, Notification, UserPromptSubmit, PreToolUse)."
 }
 
 <#

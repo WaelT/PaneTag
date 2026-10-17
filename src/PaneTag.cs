@@ -87,6 +87,15 @@ namespace PaneTag
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr GetStdHandle(int nStdHandle);
 
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);
+
+        [DllImport("kernel32.dll")]
+        public static extern void GetSystemTimePreciseAsFileTime(out long time);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetConsoleMode(IntPtr h, out uint mode);
 
@@ -303,6 +312,10 @@ namespace PaneTag
         string status = "";
         Rgb statusBg = new Rgb(0xD9730D);
         bool statusSticky;
+        // Hooks run async, each in its own ptag process, so their updates can arrive out of
+        // order. Each carries its process creation time (FILETIME); older ones are dropped,
+        // and so is a non-sticky status raised before the last keypress.
+        long statusStamp, keyStamp;
         int rows, cols;
 
         // Terminal state mirrored from the child's output stream.
@@ -521,7 +534,7 @@ namespace PaneTag
                 if (!Native.ReadConsoleW(hIn, buf, buf.Length, out n, IntPtr.Zero)) break;
                 if (n == 0) continue;
                 string s = new string(buf, 0, n);
-                if (status.Length > 0 && !statusSticky && IsKeyInput(s)) ClearStatus();
+                if (IsKeyInput(s)) OnKey();
                 if (Offset > 0) s = TranslateInput(s);
                 char[] chars = s.ToCharArray();
                 n = chars.Length;
@@ -554,10 +567,12 @@ namespace PaneTag
             return key || NonKeyInput.Replace(s, "").Length > 0;
         }
 
-        void ClearStatus()
+        // A keypress clears a non-sticky status.
+        void OnKey()
         {
             lock (gate)
             {
+                Native.GetSystemTimePreciseAsFileTime(out keyStamp);
                 if (status.Length == 0 || statusSticky) return;
                 status = "";
                 tabDirty = true;
@@ -628,11 +643,13 @@ namespace PaneTag
                     using (var server = new NamedPipeServerStream(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte))
                     {
                         server.WaitForConnection();
+                        var lines = new List<string>();
                         using (var reader = new StreamReader(server, new UTF8Encoding(false)))
                         {
                             string line;
-                            while ((line = reader.ReadLine()) != null) ApplyCommand(line);
+                            while ((line = reader.ReadLine()) != null) lines.Add(line);
                         }
+                        ApplyCommands(lines);
                     }
                 }
                 catch (Exception)
@@ -642,53 +659,85 @@ namespace PaneTag
             }
         }
 
-        void ApplyCommand(string line)
+        // One client's lines, applied together. "stamp <filetime>" orders status updates.
+        void ApplyCommands(List<string> lines)
         {
-            int sp = line.IndexOf(' ');
-            string verb = (sp < 0 ? line : line.Substring(0, sp)).Trim().ToLowerInvariant();
-            string arg = sp < 0 ? "" : line.Substring(sp + 1);
+            long stamp = 0;
+            bool sticky = false, raises = false;
+            foreach (string line in lines)
+            {
+                string verb, arg;
+                SplitCommand(line, out verb, out arg);
+                if (verb == "stamp") long.TryParse(arg.Trim(), out stamp);
+                else if (verb == "sticky") sticky = arg.Trim() == "1";
+                else if (verb == "status") raises = Cells.Sanitize(arg).Length > 0;
+            }
             lock (gate)
             {
-                Rgb c;
-                switch (verb)
+                // Clients without a stamp (Set-PaneTag, older ptag) are applied as they come.
+                bool stale = stamp != 0 && (stamp < statusStamp || (raises && !sticky && stamp < keyStamp));
+                if (stamp != 0 && !stale) statusStamp = stamp;
+                bool changed = false;
+                foreach (string line in lines)
                 {
-                    case "title":
-                        title = Cells.Sanitize(arg);
-                        if (!colorExplicit)
-                        {
-                            bg = Colors.ForTitle(title);
-                            if (!fgExplicit) fg = Colors.Contrast(bg);
-                        }
-                        tabDirty = true;
-                        break;
-                    case "color":
-                        if (!Colors.TryParse(arg, out c)) return;
-                        bg = c;
-                        colorExplicit = true;
-                        if (!fgExplicit) fg = Colors.Contrast(bg);
-                        break;
-                    case "fg":
-                        if (!Colors.TryParse(arg, out c)) return;
-                        fg = c;
-                        fgExplicit = true;
-                        break;
-                    case "status": // empty text clears it
-                        status = Cells.Sanitize(arg);
-                        tabDirty = true;
-                        break;
-                    case "statuscolor":
-                        if (!Colors.TryParse(arg, out c)) return;
-                        statusBg = c;
-                        break;
-                    case "sticky":
-                        statusSticky = arg.Trim() == "1";
-                        break;
-                    default:
-                        return;
+                    string verb, arg;
+                    SplitCommand(line, out verb, out arg);
+                    if (stale && (verb == "status" || verb == "statuscolor" || verb == "sticky")) continue;
+                    if (ApplyCommand(verb, arg)) changed = true;
                 }
+                if (!changed) return;
                 MarkDirty(false);
                 var o = new MemoryStream();
                 if (TryFlushHeader(o, true)) WriteOut(o);
+            }
+        }
+
+        static void SplitCommand(string line, out string verb, out string arg)
+        {
+            int sp = line.IndexOf(' ');
+            verb = (sp < 0 ? line : line.Substring(0, sp)).Trim().ToLowerInvariant();
+            arg = sp < 0 ? "" : line.Substring(sp + 1);
+        }
+
+        // Caller holds gate. False if the line changed nothing.
+        bool ApplyCommand(string verb, string arg)
+        {
+            Rgb c;
+            switch (verb)
+            {
+                case "title":
+                    title = Cells.Sanitize(arg);
+                    if (!colorExplicit)
+                    {
+                        bg = Colors.ForTitle(title);
+                        if (!fgExplicit) fg = Colors.Contrast(bg);
+                    }
+                    tabDirty = true;
+                    return true;
+                case "color":
+                    if (!Colors.TryParse(arg, out c)) return false;
+                    bg = c;
+                    colorExplicit = true;
+                    if (!fgExplicit) fg = Colors.Contrast(bg);
+                    return true;
+                case "fg":
+                    if (!Colors.TryParse(arg, out c)) return false;
+                    fg = c;
+                    fgExplicit = true;
+                    return true;
+                case "status": // empty text clears it
+                    status = Cells.Sanitize(arg);
+                    tabDirty = true;
+                    return true;
+                case "statuscolor":
+                    if (!Colors.TryParse(arg, out c)) return false;
+                    statusBg = c;
+                    return true;
+                case "sticky":
+                    statusSticky = arg.Trim() == "1";
+                    return true;
+                default:
+                    return false;
             }
         }
 
@@ -1139,6 +1188,7 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
                 }
                 else if (clearStatus) lines.Add("status ");
                 else if (statusColor != null) CheckColor(statusColor);
+                if (statusText != null || clearStatus) lines.Insert(0, "stamp " + StartStamp());
 
                 string pipe = Environment.GetEnvironmentVariable("PANETAG_PIPE");
                 if (string.IsNullOrEmpty(pipe))
@@ -1185,6 +1235,16 @@ come from the PANETAG_POSITION and PANETAG_COLOR environment variables.";
         }
 
         static string OneLine(string s) { return s.Replace('\r', ' ').Replace('\n', ' '); }
+
+        // When this process was created, which follows the order Claude Code fired the hooks
+        // in; the time Main is reached doesn't (runtime startup varies).
+        static long StartStamp()
+        {
+            long creation, exit, kernel, user;
+            if (Native.GetProcessTimes(Native.GetCurrentProcess(), out creation, out exit, out kernel, out user)) return creation;
+            Native.GetSystemTimePreciseAsFileTime(out creation);
+            return creation;
+        }
 
         static string CheckColor(string spec)
         {
