@@ -1,5 +1,8 @@
 # PaneTag
 
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/PaneTag)](https://www.powershellgallery.com/packages/PaneTag)
+[![Smoke tests](https://github.com/WaelT/PaneTag/actions/workflows/smoke.yml/badge.svg)](https://github.com/WaelT/PaneTag/actions/workflows/smoke.yml)
+
 Persistent title bars for Windows Terminal panes. The bar stays put while you run
 full-screen and interactive apps such as `claude`, `codex` or `edit`, so you can always
 tell which pane is which.
@@ -14,12 +17,13 @@ PaneTag reserves one row of the pane for a bar that apps can't draw over.
 ## Quick start
 
 ```powershell
-git clone https://github.com/WaelT/PaneTag.git
-cd PaneTag
-.\install.ps1              # build the helper and install the module (PowerShell 5.1 and 7)
+Install-Module PaneTag -Scope CurrentUser
 ```
 
-Then, in any pane:
+Or from source: `git clone https://github.com/WaelT/PaneTag.git`, then `.\install.ps1` in
+the clone (builds the helper with the C# compiler built into Windows; no SDK needed).
+
+Then, in any new pane:
 
 ```powershell
 ptag 'Backend API'         # add a bar (starts a fresh shell under it)
@@ -47,8 +51,6 @@ Enable-PaneTagClaudeHooks
 When Claude finishes, its bar turns **orange** (`● Your turn`); when it asks for permission,
 **red** (`● Needs you`). It goes back to normal as soon as you type in that pane.
 See [Claude Code integration](docs/usage.md#claude-code-see-which-agent-needs-you).
-
-No .NET SDK is needed: the helper is compiled with the C# compiler that ships with Windows.
 
 ## Top or bottom?
 

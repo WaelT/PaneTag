@@ -16,6 +16,7 @@ All notable changes to this project are documented here. Versions follow
   permission. Existing settings are kept and backed up.
 - `ptag Reviewing PR` without quotes now works in PowerShell too.
 - Smoke tests run on GitHub Actions.
+- Published on the PowerShell Gallery: `Install-Module PaneTag`.
 
 ## [0.2.0] - 2026-10-16
 

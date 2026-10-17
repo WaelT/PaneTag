@@ -12,27 +12,48 @@ for Windows Terminal profiles, key bindings and `wt` layout scripts.
 
 ## Installing
 
+### From the PowerShell Gallery
+
 ```powershell
-cd PaneTag        # the cloned repository
+Install-Module PaneTag -Scope CurrentUser       # or: Install-PSResource PaneTag
+```
+
+Run it in each PowerShell you use (Windows PowerShell 5.1 and PowerShell 7 keep separate
+module folders). To upgrade: `Update-Module PaneTag`. To remove: `Uninstall-Module PaneTag`.
+
+The package includes prebuilt `panetag.exe` and `ptag.exe`. They aren't code-signed; if
+your antivirus objects, install from source instead.
+
+### From source
+
+```powershell
+git clone https://github.com/WaelT/PaneTag.git
+cd PaneTag
 .\install.ps1
 ```
 
-This builds `PaneTag\panetag.exe` (plus its `ptag.exe` copy) and copies the `PaneTag`
-module folder to:
+This builds `PaneTag\panetag.exe` (plus its `ptag.exe` copy) with the C# compiler built
+into Windows and copies the `PaneTag` module folder to:
 
 - `Documents\WindowsPowerShell\Modules\PaneTag` (Windows PowerShell 5.1)
 - `Documents\PowerShell\Modules\PaneTag` (PowerShell 7)
 
+To uninstall, delete those two `PaneTag` folders.
+
+### After installing
+
 PowerShell loads the module automatically the first time you type `ptag` or
 `Set-PaneTag`, so you don't need to edit your profile. Open a new pane after installing.
 
-To find where it was installed (for example when Documents is redirected to OneDrive):
+To find where it was installed (Gallery installs use a versioned folder such as
+`PaneTag\0.3.0`, and Documents may be redirected to OneDrive):
 
 ```powershell
 (Get-Module -ListAvailable PaneTag).ModuleBase
 ```
 
-To uninstall, delete those two `PaneTag` folders.
+If you use the [Claude Code hooks](#claude-code-see-which-agent-needs-you), run
+`Enable-PaneTagClaudeHooks` again after upgrading: the hooks point to `ptag.exe` in that folder.
 
 ## `Set-PaneTag` / `ptag`
 
@@ -262,8 +283,14 @@ top row of the screen. A top bar means the scrolling area starts at row 2. See
 
 ## Windows Terminal integration
 
-In the examples below, `panetag.exe` lives in the installed module folder. Adjust the
-path if your Documents folder is elsewhere (see [Installing](#installing)).
+The examples below need the path to `panetag.exe` in the installed module folder. Get it with:
+
+```powershell
+Join-Path (Get-Module -ListAvailable PaneTag | Select-Object -First 1).ModuleBase panetag.exe
+```
+
+The JSON examples use the from-source location; a Gallery install adds a version folder
+(`...\Modules\PaneTag\0.3.0\panetag.exe`), so update the path after upgrading.
 
 ### A profile that always has a bar
 
@@ -280,7 +307,7 @@ In Windows Terminal, open **Settings → Open JSON file** and add a profile:
 ### Open a split pane with a bar from the command line
 
 ```powershell
-$pt = "$HOME\Documents\WindowsPowerShell\Modules\PaneTag\panetag.exe"
+$pt = Join-Path (Get-Module -ListAvailable PaneTag | Select-Object -First 1).ModuleBase panetag.exe
 wt -w 0 sp -V $pt -t Logs -c gray
 ```
 
@@ -291,7 +318,7 @@ wt -w 0 sp -V $pt -t Logs -c gray
 In PowerShell, `wt` subcommands are separated with an escaped semicolon (`` `; ``):
 
 ```powershell
-$pt = "$HOME\Documents\WindowsPowerShell\Modules\PaneTag\panetag.exe"
+$pt = Join-Path (Get-Module -ListAvailable PaneTag | Select-Object -First 1).ModuleBase panetag.exe
 wt -w 0 nt -d E:\Projects\app $pt -t Frontend -c blue -- claude `; `
    sp -V -d E:\Projects\app $pt -t Backend -c green -- claude `; `
    sp -H -d E:\Projects\app $pt -t Tests -c orange
