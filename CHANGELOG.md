@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+### Changed
+
+- `tools/publish.ps1` also reads the API key from a `PSGALLERY_API_KEY=...` line in a
+  gitignored `.env` at the repo root.
+- Docs: `docs/alternatives.md` covers Linux (Zellij, Terminator, Tilix, GNU screen).
+
 ## [0.4.0] - 2026-10-17
 
 ### Added

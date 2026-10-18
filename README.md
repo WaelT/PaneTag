@@ -52,7 +52,8 @@ Enable-PaneTagClaudeHooks
 
 When Claude finishes, its bar turns **orange** (`● Your turn`); when it asks for permission,
 **red** (`● Needs you`). After a minute it shows how long it has waited (`· 4m`), so you
-know which pane to visit first. It goes back to normal as soon as you type in that pane.
+know which pane to visit first. It goes back to normal as soon as you type in that pane or
+Claude gets back to work.
 See [Claude Code integration](docs/usage.md#claude-code-see-which-agent-needs-you).
 
 ## Top or bottom?
@@ -74,7 +75,7 @@ $env:PANETAG_POSITION = 'bottom'   # in your $PROFILE, to make it the default
 | [docs/architecture.md](docs/architecture.md) | How it works: pseudo console, escape-sequence rewriting, threads, pipe protocol |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common problems and fixes |
 | [docs/development.md](docs/development.md) | Building, testing and changing the code |
-| [docs/alternatives.md](docs/alternatives.md) | Similar tools on Windows and macOS, and how PaneTag differs |
+| [docs/alternatives.md](docs/alternatives.md) | Similar tools on Windows, macOS and Linux, and how PaneTag differs |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Reporting bugs and contributing changes |
 | [AGENTS.md](AGENTS.md) | Instructions for coding agents working on this repo |

@@ -135,6 +135,10 @@ bottom bar:
 - [ ] `ptag Renamed` and `ptag -Color red` inside the pane; `! ptag Renamed` inside Claude Code.
 - [ ] With `Enable-PaneTagClaudeHooks`: the bar turns orange when Claude finishes and red at a
       permission prompt (a few seconds after it appears), and clears when you type.
+- [ ] Hooks: after a minute the flag reads `● Needs you · 1m`, then `· 2m`, in the bar and
+      the tab title; a narrow pane still truncates the label cleanly.
+- [ ] Hooks: let Claude end its turn while a background task runs; "Your turn" clears when
+      Claude resumes on its own and uses a tool.
 - [ ] Ctrl+C interrupts the app, not the bar. Pasting multi-line text works.
 - [ ] `exit`: the bar row is cleared, the original tab title returns, the shell works normally.
 
@@ -148,6 +152,8 @@ bottom bar:
   `TryFlushHeader`, which checks that it's safe.
 - **New pipe command:** add a `case` in `ApplyCommand`, a parameter in `Set-PaneTag`,
   and document it in [usage.md](usage.md) and [architecture.md](architecture.md#rename-pipe).
+  If it belongs to a status update, add its verb to the list `ApplyCommands` skips for
+  stale (out-of-order) batches.
 - **New `panetag.exe` option:** parse it in `Program.Main`, add it to the `Usage` text
   and to [usage.md](usage.md).
 - **Module code** must stay compatible with Windows PowerShell 5.1: no ternary operator,

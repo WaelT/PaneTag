@@ -20,20 +20,25 @@ pane when a tab is split:
 PaneTag draws the title **inside each pane**, so it stays visible for every pane at once
 and no app can overwrite it.
 
-## On macOS (and Linux)
+## On macOS and Linux
 
-Several terminals already have per-pane titles built in:
+Several terminals and multiplexers already have per-pane titles built in:
 
-| Terminal | Per-pane titles |
-| --- | --- |
-| iTerm2 | Built in: "Show per-pane title bar with split panes", plus per-pane status bars ([docs](https://iterm2.com/documentation-preferences-appearance.html)) |
-| kitty | Built in since March 2026: optional `window_title_bar` above or below each split ([PR #9450](https://github.com/kovidgoyal/kitty/pull/9450)) |
-| tmux | Built in: pane border titles (`pane-border-status`), in any terminal |
-| Ghostty | Requested, closed as not planned ([#11774](https://github.com/ghostty-org/ghostty/issues/11774)) |
-| WezTerm | Requested ([#1970](https://github.com/wezterm/wezterm/issues/1970)) |
+| Tool | Platform | Per-pane titles |
+| --- | --- | --- |
+| iTerm2 | macOS | Built in: "Show per-pane title bar with split panes", plus per-pane status bars ([docs](https://iterm2.com/documentation-preferences-appearance.html)) |
+| kitty | macOS, Linux | Built in since March 2026: optional `window_title_bar` above or below each split ([PR #9450](https://github.com/kovidgoyal/kitty/pull/9450)) |
+| tmux | any terminal | Built in: pane border titles (`pane-border-status top`, rename with `select-pane -T`) |
+| Zellij | macOS, Linux | Pane frames show each pane's title; rename a running pane (`c` in pane mode) or name it at creation (`new-pane --name`); a name you set overrides the app's title ([PR #928](https://github.com/zellij-org/zellij/pull/928), [CLI actions](https://zellij.dev/documentation/cli-actions)) |
+| Terminator | Linux | Every split has its own title bar ([man page](https://man7.org/linux/man-pages/man1/terminator.1.html)) |
+| Tilix | Linux | Every terminal in a split has a title line, with custom titles ([Fedora package](https://packages.fedoraproject.org/pkgs/tilix/tilix/)) |
+| GNU screen | any terminal | A caption line on split regions; `caption always` shows it even without splits ([manual](https://www.gnu.org/software/screen/manual/html_node/Caption.html)) |
+| Ghostty | macOS, Linux | Requested, closed as not planned ([#11774](https://github.com/ghostty-org/ghostty/issues/11774)) |
+| WezTerm | macOS, Linux | Requested ([#1970](https://github.com/wezterm/wezterm/issues/1970)) |
 
-So on macOS, PaneTag is best described as "the iTerm2/kitty per-pane title bar, for Windows
-Terminal".
+So outside Windows the problem is mostly solved, and PaneTag is best described as "the
+iTerm2/kitty per-pane title bar, for Windows Terminal". The closest match for the Claude
+Code flags is tmux: run `tmux select-pane -T "● Needs you"` from the same hooks.
 
 ## Claude Code status signals
 

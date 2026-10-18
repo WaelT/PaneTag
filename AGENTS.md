@@ -22,6 +22,7 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 | `docs/` | Usage, architecture, troubleshooting, development |
 | `build.ps1`, `install.ps1` | Build; build and install to the user's module folders |
 | `tools/publish.ps1` | Build, test and publish to the PowerShell Gallery (the user runs it) |
+| `.env` | Gitignored, local only: the user's `PSGALLERY_API_KEY`, read by `tools/publish.ps1` |
 | `tools/demo/` | `play.ps1` plays the README demo full screen for the user to record; `scene.ps1` runs each pane |
 | `docs/assets/panetag-demo.gif` | The README demo (renamed from `demo.gif` to bust GitHub's image cache) |
 | `.github/workflows/smoke.yml` | Runs `tests/smoke.ps1` on GitHub Actions (Windows PowerShell 5.1) |
@@ -37,7 +38,18 @@ Read [docs/architecture.md](docs/architecture.md) before changing `src/PaneTag.c
 Don't run `install.ps1` unless the user asks: it writes to their Documents folder. Never
 run `tools\publish.ps1` (it publishes to the PowerShell Gallery with the user's API key), and
 never edit the user's real `~/.claude/settings.json`; test hooks with `-SettingsPath` on a
-temp file.
+temp file. Never print, copy or commit the contents of `.env`.
+
+## Releasing (when the user asks)
+
+1. Bump `ModuleVersion` in `PaneTag/PaneTag.psd1`; move CHANGELOG "Unreleased" under
+   `## [X.Y.Z] - <date>`; update the versioned example paths in `docs/usage.md`.
+2. `.\tests\smoke.ps1`, commit "Release X.Y.Z", push, then an annotated tag `vX.Y.Z` and push it.
+3. Zip the `PaneTag` folder (with the freshly built exes) as `PaneTag-X.Y.Z.zip` and run
+   `gh release create vX.Y.Z <zip> --title "PaneTag X.Y.Z" --notes-file <notes>`, with
+   notes in the format of the previous release (`gh release view`).
+4. The user publishes to the Gallery with `tools\publish.ps1`, then re-runs
+   `Enable-PaneTagClaudeHooks` (hooks hold the module path) and restarts their bars.
 
 ## Hard constraints
 
@@ -90,6 +102,14 @@ temp file.
 - **Windows PowerShell mangles double quotes in native arguments**, including
   `git commit -m` and `gh --jq`: use `git commit -F <file>`, `--notes-file`, and parse
   `gh ... --json` output with `ConvertFrom-Json`.
+- **PowerShell's comma binds tighter than `+`:** `@('stamp ' + $t, 'status x')` is one
+  string, not two lines. Parenthesize (`@(('stamp ' + $t), 'status x')`). This made the
+  0.3.1 ordering tests pass without testing anything; give new tests a positive control.
+- **Claude Code hooks are async** and each runs as its own `ptag.exe`, so updates can arrive
+  out of order; status lines carry a `stamp` (see architecture.md). Claude also resumes
+  without `UserPromptSubmit` (background tasks, `/loop`), hence the `PreToolUse` hook.
+- **Running bars keep their version.** A pane started under an older `panetag.exe` ignores
+  newer pipe lines (e.g. `timer`) until the user restarts that bar.
 - **Under `$ErrorActionPreference = 'Stop'`, native stderr is a terminating error** in
   Windows PowerShell; scripts that run native tools (ffmpeg, git) switch to `'Continue'`
   around them.
